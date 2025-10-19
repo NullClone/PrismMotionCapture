@@ -40,3 +40,4 @@ ExportedObj/
 *.app
 
 /[Aa]ssets/Plugins/RootMotion/
+/[Pp]ackages/com.github.homuler.mediapipe/
