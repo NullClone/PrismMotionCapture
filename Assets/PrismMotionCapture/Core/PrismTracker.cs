@@ -32,7 +32,7 @@ namespace PMC
         [SerializeField] private bool _smoothSegmentation = false;
 
         [Header("Debug")]
-        [SerializeField] private PoseWorldLandmarkListAnnotationController _poseWorldLandmarkListAnnotationController;
+        [SerializeField] private PoseWorldLandmarkListAnnotationController2 _poseWorldLandmarkListAnnotationController2;
         [SerializeField] private HandLandmarkListAnnotationController _handLandmarkListAnnotationController;
 
         [SerializeField, HideInInspector] private TextAsset _CPUConfig;
@@ -80,10 +80,11 @@ namespace PMC
 
         private void Awake()
         {
-            if (_poseWorldLandmarkListAnnotationController != null)
+            if (_poseWorldLandmarkListAnnotationController2 != null)
             {
-                _poseWorldLandmarkListAnnotationController.rotationAngle = RotationAngle.Rotation180;
-                _poseWorldLandmarkListAnnotationController.isMirrored = true;
+                _poseWorldLandmarkListAnnotationController2.rotationAngle = RotationAngle.Rotation180;
+                _poseWorldLandmarkListAnnotationController2.isMirrored = true;
+                _poseWorldLandmarkListAnnotationController2.VisualizeZ = true;
             }
 
             if (_handLandmarkListAnnotationController != null)
@@ -322,7 +323,7 @@ namespace PMC
         private void OnPoseRoiOutput(object _, OutputStream<NormalizedRect>.OutputEventArgs eventArgs) => OnPoseRoi?.Invoke(eventArgs.Get());
 
 
-        private void OnPoseWorldLandmarksUpdate(LandmarkList landmarkList) => _poseWorldLandmarkListAnnotationController?.DrawLater(landmarkList);
+        private void OnPoseWorldLandmarksUpdate(LandmarkList landmarkList) => _poseWorldLandmarkListAnnotationController2?.DrawLater(landmarkList);
 
         private void OnLeftHandLandmarksUpdate(NormalizedLandmarkList landmarkList) => _handLandmarkListAnnotationController?.DrawLater(landmarkList);
     }
