@@ -4,6 +4,7 @@ using UnityEngine.Video;
 
 namespace PMC
 {
+    [AddComponentMenu("Prism Motion Capture/Image Source")]
     public sealed class ImageSource : MonoBehaviour
     {
         // Properties
@@ -83,6 +84,38 @@ namespace PMC
                         break;
                     }
             }
+
+            switch (_renderMode)
+            {
+                case RenderMode.Renderer:
+                    {
+                        var aspect = (float)_resolution.x / _resolution.y;
+
+                        if (_renderer.transform.localScale.x / _renderer.transform.localScale.y != aspect)
+                        {
+                            _renderer.transform.localScale = new Vector3(
+                            _renderer.transform.localScale.x * aspect,
+                            _renderer.transform.localScale.y,
+                            _renderer.transform.localScale.z);
+                        }
+
+                        break;
+                    }
+                case RenderMode.RawImage:
+                    {
+                        var aspect = (float)_resolution.x / _resolution.y;
+
+                        if (_rawImage.rectTransform.localScale.x / _rawImage.rectTransform.localScale.y != aspect)
+                        {
+                            _rawImage.rectTransform.localScale = new Vector3(
+                            _rawImage.rectTransform.localScale.x * aspect,
+                            _rawImage.rectTransform.localScale.y,
+                            _rawImage.rectTransform.localScale.z);
+                        }
+
+                        break;
+                    }
+            }
         }
 
         private void Update()
@@ -132,16 +165,6 @@ namespace PMC
                             {
                                 _renderer.material.SetTexture(_propertyName, _buffer);
                             }
-
-                            var aspect = (float)_resolution.x / _resolution.y;
-
-                            if (_renderer.transform.localScale.x / _renderer.transform.localScale.y != aspect)
-                            {
-                                _renderer.transform.localScale = new Vector3(
-                                _renderer.transform.localScale.x * aspect,
-                                _renderer.transform.localScale.y,
-                                _renderer.transform.localScale.z);
-                            }
                         }
 
                         break;
@@ -151,16 +174,6 @@ namespace PMC
                         if (_rawImage && _rawImage.material)
                         {
                             _rawImage.texture = _buffer;
-
-                            var aspect = (float)_resolution.x / _resolution.y;
-
-                            if (_rawImage.rectTransform.localScale.x / _rawImage.rectTransform.localScale.y != aspect)
-                            {
-                                _rawImage.rectTransform.localScale = new Vector3(
-                                _rawImage.rectTransform.localScale.x * aspect,
-                                _rawImage.rectTransform.localScale.y,
-                                _rawImage.rectTransform.localScale.z);
-                            }
                         }
 
                         break;

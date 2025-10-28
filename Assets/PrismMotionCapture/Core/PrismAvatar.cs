@@ -1,35 +1,30 @@
 using Mediapipe;
 using RootMotion;
 using RootMotion.FinalIK;
+using System.Collections.Generic;
 using UnityEngine;
+using Color = UnityEngine.Color;
 
 namespace PMC
 {
-    public sealed class Avatar : MonoBehaviour
+    [AddComponentMenu("Prism Motion Capture/Prism Avatar")]
+    [DisallowMultipleComponent]
+    [RequireComponent(typeof(Animator))]
+    public sealed class PrismAvatar : MonoBehaviour
     {
         // Fields
 
-        [Space]
-        [SerializeField] private IKType _IKType = IKType.VRIK;
-        [Space]
-        [SerializeField] private HolisticTracker _tracker;
-        [Header("Tracking Setting")]
-        [Space]
+        [SerializeField] private PrismTracker _tracker;
+        [SerializeField] private IKType _IKType = IKType.FBBIK;
+        [SerializeField] private bool _enableMovement = true;
         [SerializeField] private bool _autoWeight = true;
-        [SerializeField] private Vector3 _landmarkScale = Vector3.one;
-        [Header("Kalman Filter Setting")]
-        [Space]
+        [SerializeField] private Vector3 _landmarkScale = new(1f, 1f, -1f);
+        [SerializeField] private Vector3 _handRotationOffset = new(0f, 90f, 0f);
+        [SerializeField] private Vector3 _leftHandRotationOffset = new(0f, 90f, 0f);
         [SerializeField] private bool _enableKalmanFilter = true;
         [SerializeField] private float _timeInterval = 0.45f;
         [SerializeField] private float _noise = 0.4f;
-        [Header("Calibration Setting")]
-        [Space]
         [SerializeField] private bool _executeCalibration = false;
-        [SerializeField] private float _scaleMip = 1f;
-        [Header("Debug Setting")]
-        [Space]
-        [SerializeField] private bool _isWorldSpace = true;
-        [SerializeField] private Keypoint[] _poseKeypoints;
 
         private Animator _animator;
 
@@ -58,13 +53,18 @@ namespace PMC
         private Landmark[] _poseLandmarks;
         private Landmark[] _poseWorldLandmarks;
         private Landmark[] _leftHandLandmarks;
-        private Transform[] _fingerTransforms;
+        private Landmark[] _rightHandLandmarks;
 
         private Vector3 _baseScale;
         private Vector3 _basePosition;
-        private Vector3 _leftHandPositon;
-        private float _pelvisHeight;
+        private Vector3 _pelvisBasePosition;
+
         private float _sittingHeight;
+        private bool _activePoseLandmark;
+        private bool _activeLeftHandLandmark;
+        private bool _activeRightHandLandmark;
+
+        private Dictionary<HumanBodyBones, Quaternion> _initialLocalRotations = new();
 
 
         private static readonly HumanBodyBones[] FingerBones = new HumanBodyBones[]
@@ -129,63 +129,68 @@ namespace PMC
                 }
             }
 
-            if (_poseLandmarks == null)
+            _poseLandmarks = new Landmark[(int)PoseLandmark.Count];
+            _poseWorldLandmarks = new Landmark[(int)PoseLandmark.Count];
+            _leftHandLandmarks = new Landmark[(int)HandLandmark.Count];
+            _rightHandLandmarks = new Landmark[(int)HandLandmark.Count];
+
+            for (int i = 0; i < _poseLandmarks.Length; i++)
             {
-                _poseLandmarks = new Landmark[(int)PoseLandmark.Count];
-
-                for (int i = 0; i < _poseLandmarks.Length; i++)
+                if (_poseLandmarks[i] == null)
                 {
-                    if (_poseLandmarks[i] == null)
-                    {
-                        _poseLandmarks[i] = new Landmark();
-                    }
+                    _poseLandmarks[i] = new Landmark();
+                }
 
-                    if (_enableKalmanFilter)
-                    {
-                        _poseLandmarks[i].KalmanFilter = new KalmanFilter();
-                        _poseLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
-                        _poseLandmarks[i].KalmanFilter.Predict();
-                    }
+                if (_enableKalmanFilter)
+                {
+                    _poseLandmarks[i].KalmanFilter = new KalmanFilter();
+                    _poseLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
+                    _poseLandmarks[i].KalmanFilter.Predict();
                 }
             }
 
-            if (_poseWorldLandmarks == null)
+            for (int i = 0; i < _poseWorldLandmarks.Length; i++)
             {
-                _poseWorldLandmarks = new Landmark[(int)PoseLandmark.Count];
-
-                for (int i = 0; i < _poseWorldLandmarks.Length; i++)
+                if (_poseWorldLandmarks[i] == null)
                 {
-                    if (_poseWorldLandmarks[i] == null)
-                    {
-                        _poseWorldLandmarks[i] = new Landmark();
-                    }
+                    _poseWorldLandmarks[i] = new Landmark();
+                }
 
-                    if (_enableKalmanFilter)
-                    {
-                        _poseWorldLandmarks[i].KalmanFilter = new KalmanFilter();
-                        _poseWorldLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
-                        _poseWorldLandmarks[i].KalmanFilter.Predict();
-                    }
+                if (_enableKalmanFilter)
+                {
+                    _poseWorldLandmarks[i].KalmanFilter = new KalmanFilter();
+                    _poseWorldLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
+                    _poseWorldLandmarks[i].KalmanFilter.Predict();
                 }
             }
 
-            if (_leftHandLandmarks == null)
+            for (int i = 0; i < _leftHandLandmarks.Length; i++)
             {
-                _leftHandLandmarks = new Landmark[(int)HandLandmark.Count];
-
-                for (int i = 0; i < _leftHandLandmarks.Length; i++)
+                if (_leftHandLandmarks[i] == null)
                 {
-                    if (_leftHandLandmarks[i] == null)
-                    {
-                        _leftHandLandmarks[i] = new Landmark();
-                    }
+                    _leftHandLandmarks[i] = new Landmark();
+                }
 
-                    if (_enableKalmanFilter)
-                    {
-                        _leftHandLandmarks[i].KalmanFilter = new KalmanFilter();
-                        _leftHandLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
-                        _leftHandLandmarks[i].KalmanFilter.Predict();
-                    }
+                if (_enableKalmanFilter)
+                {
+                    _leftHandLandmarks[i].KalmanFilter = new KalmanFilter();
+                    _leftHandLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
+                    _leftHandLandmarks[i].KalmanFilter.Predict();
+                }
+            }
+
+            for (int i = 0; i < _rightHandLandmarks.Length; i++)
+            {
+                if (_rightHandLandmarks[i] == null)
+                {
+                    _rightHandLandmarks[i] = new Landmark();
+                }
+
+                if (_enableKalmanFilter)
+                {
+                    _rightHandLandmarks[i].KalmanFilter = new KalmanFilter();
+                    _rightHandLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
+                    _rightHandLandmarks[i].KalmanFilter.Predict();
                 }
             }
         }
@@ -194,18 +199,12 @@ namespace PMC
         {
             if (_animator == null) return;
 
-            _fingerTransforms = new Transform[FingerBones.Length];
-
-            for (int i = 0; i < _fingerTransforms.Length; i++)
-            {
-                _fingerTransforms[i] = _animator.GetBoneTransform(FingerBones[i]);
-            }
-
             if (_tracker != null)
             {
-                _tracker.OnPoseLandmarksAction += OnPoseLandmarks;
-                _tracker.OnPoseWorldLandmarksAction += OnPoseWorldLandmarks;
-                _tracker.OnLeftHandLandmarksAction += OnLeftHandLandmarks;
+                _tracker.OnPoseLandmarks += OnPoseLandmarks;
+                _tracker.OnPoseWorldLandmarks += OnPoseWorldLandmarks;
+                _tracker.OnLeftHandLandmarks += OnLeftHandLandmarks;
+                _tracker.OnRightHandLandmarks += OnRightHandLandmarks;
             }
 
             CreateTarget();
@@ -213,17 +212,15 @@ namespace PMC
             if (_IKType == IKType.VRIK)
             {
                 _VRIK.solver.OnPreUpdate += OnPreVRIK;
-                _VRIK.solver.OnPostUpdate += OnPostVRIK;
 
-                SetUpVRIK();
+                InitializeVRIK();
             }
 
             if (_IKType == IKType.FBBIK)
             {
                 _FBBIK.solver.OnPreUpdate += OnPreFBBIK;
-                _FBBIK.solver.OnPostUpdate += OnPostFBBIK;
 
-                SetUpFBBIK();
+                InitializeFBBIK();
             }
 
             _executeCalibration = false;
@@ -231,110 +228,92 @@ namespace PMC
 
         private void Update()
         {
-            if (_poseKeypoints == null || _poseKeypoints.Length != _poseWorldLandmarks.Length) return;
-
-            for (int i = 0; i < _poseKeypoints.Length; i++)
-            {
-                if (_isWorldSpace)
-                {
-                    _poseKeypoints[i].SetValue(_poseWorldLandmarks[i].Position, true);
-                }
-                else
-                {
-                    _poseKeypoints[i].SetValue(_poseLandmarks[i].Position, true);
-                }
-            }
+            // Editor Only
+            ExecuteCalibration();
         }
 
         private void OnDestroy()
         {
-            _tracker.OnPoseLandmarksAction -= OnPoseLandmarks;
-            _tracker.OnPoseWorldLandmarksAction -= OnPoseWorldLandmarks;
-            _tracker.OnLeftHandLandmarksAction -= OnLeftHandLandmarks;
+            if (_tracker != null)
+            {
+                _tracker.OnPoseLandmarks -= OnPoseLandmarks;
+                _tracker.OnPoseWorldLandmarks -= OnPoseWorldLandmarks;
+                _tracker.OnLeftHandLandmarks -= OnLeftHandLandmarks;
+                _tracker.OnRightHandLandmarks += OnRightHandLandmarks;
+            }
 
             if (_IKType == IKType.VRIK)
             {
-                _VRIK.solver.OnPreUpdate += OnPreVRIK;
-                _VRIK.solver.OnPostUpdate += OnPostVRIK;
+                _VRIK.solver.OnPreUpdate -= OnPreVRIK;
             }
 
             if (_IKType == IKType.FBBIK)
             {
-                _FBBIK.solver.OnPreUpdate += OnPreFBBIK;
-                _FBBIK.solver.OnPostUpdate += OnPostFBBIK;
+                _FBBIK.solver.OnPreUpdate -= OnPreFBBIK;
+            }
+        }
+
+        private void OnDrawGizmos()
+        {
+            if (!Application.isPlaying) return;
+
+            if (_activeLeftHandLandmark)
+            {
+                var leftHandWristToMiddle = _leftHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position - _leftHandLandmarks[(int)HandLandmark.Wrist].Position;
+                var leftHandPinkyToIndex = _leftHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position - _leftHandLandmarks[(int)HandLandmark.PinkyMcp].Position;
+                var leftHandUpVector = Vector3.Cross(leftHandPinkyToIndex, leftHandWristToMiddle).normalized;
+                var leftHandForwardVector = Vector3.Cross(leftHandUpVector, leftHandPinkyToIndex).normalized;
+
+                var rotation = LookRotation(leftHandForwardVector, -leftHandUpVector) * Quaternion.Euler(_handRotationOffset);
+
+                var length = 0.25f;
+
+                Gizmos.color = new Color(0f, 0f, 1f, 1f);
+                Gizmos.DrawRay(_animator.GetBoneTransform(HumanBodyBones.LeftHand).position, rotation * (length * Vector3.forward));
+
+                Gizmos.color = new Color(0f, 1f, 0f, 1f);
+                Gizmos.DrawRay(_animator.GetBoneTransform(HumanBodyBones.LeftHand).position, rotation * (length * Vector3.up));
+
+                Gizmos.color = new Color(1f, 0f, 0f, 1f);
+                Gizmos.DrawRay(_animator.GetBoneTransform(HumanBodyBones.LeftHand).position, rotation * (length * Vector3.right));
             }
         }
 
         private void OnPreVRIK()
         {
-            if (_poseWorldLandmarks != null && _poseWorldLandmarks[(int)PoseLandmark.Count - 1] != null)
+            if (_activePoseLandmark)
             {
-                if (_poseWorldLandmarks[(int)PoseLandmark.Nose].Visibility != 0f)
-                {
-                    _VRIK.solver.IKPositionWeight = 1f;
-                }
-                else return;
-
                 UpdateTarget();
-                CalculateVRIK();
-                Calibration();
+
+                UpdateVRIK();
             }
-
-            if (_poseLandmarks != null && _poseLandmarks[(int)PoseLandmark.Count - 1] != null)
-            {
-
-            }
-        }
-
-        private void OnPostVRIK()
-        {
-
         }
 
         private void OnPreFBBIK()
         {
-            if (_poseWorldLandmarks != null && _poseWorldLandmarks[(int)PoseLandmark.Count - 1] != null)
-            {
-                if (_poseWorldLandmarks[(int)PoseLandmark.Nose].Visibility != 0f)
-                {
-                    _FBBIK.solver.IKPositionWeight = 1f;
-                }
+            _root.transform.localRotation = _FBBIK.references.root.rotation;
 
+            if (_activePoseLandmark)
+            {
                 UpdateTarget();
-                CalculateFBBIK();
-                Calibration();
+
+                UpdateFBBIK();
+
+                if (_enableMovement)
+                {
+                    var c_Hip = (_poseLandmarks[(int)PoseLandmark.LeftHip].Position + _poseLandmarks[(int)PoseLandmark.RightHip].Position) / 2;
+
+                    _root.transform.localPosition = new Vector3(c_Hip.x, c_Hip.y, c_Hip.z) + _basePosition;
+
+                    _FBBIK.references.root.position = _root.transform.localPosition - _pelvisBasePosition;
+                }
             }
 
-            if (_poseLandmarks != null && _poseLandmarks[(int)PoseLandmark.Count - 1] != null)
-            {
-                //var c_Hip = (_poseLandmarks[(int)PoseLandmark.LeftHip].Position + _poseLandmarks[(int)PoseLandmark.RightHip].Position) / 2;
-
-                //_root.localPosition = c_Hip + _basePosition;
-                //gameObject.transform.localPosition = new Vector3(c_Hip.x, c_Hip.y - _pelvisHeight, c_Hip.z) + _basePosition;
-            }
-
-            if (_leftHandLandmarks != null && _leftHandLandmarks[(int)HandLandmark.Count - 1] != null)
-            {
-                _leftHandPositon = _leftHandLandmarks[(int)HandLandmark.Wrist].Position;
-
-                var leftIndexProximal = _animator.GetBoneTransform(HumanBodyBones.LeftIndexProximal);
-                var leftIndexIntermediate = _animator.GetBoneTransform(HumanBodyBones.LeftIndexIntermediate);
-
-                var leftIndexProximalForward = (_leftHandLandmarks[(int)HandLandmark.IndexFingerPip].Position - _leftHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position).normalized;
-
-                //leftIndexProximal.localRotation = LookRotation(leftIndexProximalForward, Vector3.up);
-            }
+            UpdateFinger();
         }
 
-        private void OnPostFBBIK()
+        private void InitializeVRIK()
         {
-
-        }
-
-        private void SetUpVRIK()
-        {
-            _VRIK.enabled = false;
-
             _VRIK.AutoDetectReferences();
 
             _VRIK.solver.FixTransforms();
@@ -343,7 +322,7 @@ namespace PMC
 
             _basePosition = _VRIK.references.root.position;
             _baseScale = _VRIK.references.root.localScale;
-
+            _pelvisBasePosition = _VRIK.references.pelvis.localPosition;
             _sittingHeight = Vector3.Distance(_VRIK.references.head.position, _VRIK.references.pelvis.position);
 
             _root.position = _VRIK.references.pelvis.position;
@@ -384,10 +363,10 @@ namespace PMC
             _VRIK.solver.spine.pelvisPositionWeight = 1f;
             _VRIK.solver.spine.pelvisRotationWeight = 1f;
             _VRIK.solver.leftArm.positionWeight = 1f;
-            _VRIK.solver.leftArm.rotationWeight = 0f;
+            _VRIK.solver.leftArm.rotationWeight = 1f;
             _VRIK.solver.leftArm.bendGoalWeight = 1f;
             _VRIK.solver.rightArm.positionWeight = 1f;
-            _VRIK.solver.rightArm.rotationWeight = 0f;
+            _VRIK.solver.rightArm.rotationWeight = 1f;
             _VRIK.solver.rightArm.bendGoalWeight = 1f;
             _VRIK.solver.leftLeg.positionWeight = 1f;
             _VRIK.solver.leftLeg.rotationWeight = 1f;
@@ -415,13 +394,11 @@ namespace PMC
 
             _rootController.Calibrate();
 
-            _VRIK.enabled = true;
+            _VRIK.solver.IKPositionWeight = 1f;
         }
 
-        private void SetUpFBBIK()
+        private void InitializeFBBIK()
         {
-            _FBBIK.enabled = false;
-
             var references = new BipedReferences();
 
             BipedReferences.AutoDetectReferences(ref references, transform, new BipedReferences.AutoDetectParams(true, true));
@@ -435,8 +412,7 @@ namespace PMC
 
             _basePosition = _FBBIK.references.root.position;
             _baseScale = _FBBIK.references.root.localScale;
-
-            _pelvisHeight = _FBBIK.references.pelvis.position.y;
+            _pelvisBasePosition = _FBBIK.references.pelvis.localPosition;
             _sittingHeight = Vector3.Distance(_FBBIK.references.head.position, _FBBIK.references.pelvis.position);
 
             _root.position = _FBBIK.references.pelvis.position;
@@ -492,15 +468,34 @@ namespace PMC
             _FBBIK.solver.rightThighEffector.positionWeight = 1f;
             _FBBIK.solver.rightThighEffector.rotationWeight = 1f;
 
+            _FBBIK.solver.leftArmChain.bendConstraint.weight = 0.7f;
+            _FBBIK.solver.rightArmChain.bendConstraint.weight = 0.7f;
+
+            _FBBIK.solver.headMapping.maintainRotationWeight = 1f;
+            _FBBIK.solver.leftArmMapping.maintainRotationWeight = 1f;
+            _FBBIK.solver.rightArmMapping.maintainRotationWeight = 1f;
+            _FBBIK.solver.leftLegMapping.maintainRotationWeight = 1f;
+            _FBBIK.solver.rightLegMapping.maintainRotationWeight = 1f;
+
             _FBBIK.solver.bodyEffector.effectChildNodes = false;
 
             _headEffector = _headTarget.gameObject.AddComponent<FBBIKHeadEffector>();
             _headEffector.ik = _FBBIK;
             _headEffector.positionWeight = 1f;
             _headEffector.rotationWeight = 1f;
-            //_headEffector.handsPullBody = false;
+            _headEffector.bodyClampWeight = 0f;
+            _headEffector.headClampWeight = 0f;
 
-            _FBBIK.enabled = true;
+            _FBBIK.solver.IKPositionWeight = 1f;
+
+            foreach (var bone in FingerBones)
+            {
+                var transform = _animator.GetBoneTransform(bone);
+
+                if (transform == null) continue;
+
+                _initialLocalRotations.Add(bone, transform.localRotation);
+            }
         }
 
         private void CreateTarget()
@@ -573,30 +568,52 @@ namespace PMC
             // Left Hand Rotation
             // --------------------------------------------------
 
-            var centerLeftHandPosition = (_poseWorldLandmarks[(int)PoseLandmark.LeftIndex].Position + _poseWorldLandmarks[(int)PoseLandmark.LeftPinky].Position) / 2f;
-            var leftHandForwardVector = (centerLeftHandPosition - _poseWorldLandmarks[(int)PoseLandmark.LeftWrist].Position).normalized;
-            var leftHandSideVector = (_poseWorldLandmarks[(int)PoseLandmark.LeftPinky].Position - _poseWorldLandmarks[(int)PoseLandmark.LeftIndex].Position).normalized;
-            var leftHandPalmNormal = Vector3.Cross(leftHandSideVector, leftHandForwardVector).normalized;
-            var leftThumbToWristVector = (_poseWorldLandmarks[(int)PoseLandmark.LeftThumb].Position - _poseWorldLandmarks[(int)PoseLandmark.LeftWrist].Position).normalized;
+            if (!_activeLeftHandLandmark)
+            {
+                var centerLeftHandPosition = (_poseWorldLandmarks[(int)PoseLandmark.LeftIndex].Position + _poseWorldLandmarks[(int)PoseLandmark.LeftPinky].Position) / 2f;
+                var leftHandForwardVector = (centerLeftHandPosition - _poseWorldLandmarks[(int)PoseLandmark.LeftWrist].Position).normalized;
+                var leftHandRightVector = (_poseWorldLandmarks[(int)PoseLandmark.LeftIndex].Position - _poseWorldLandmarks[(int)PoseLandmark.LeftPinky].Position).normalized;
+                var leftHandUpVector = Vector3.Cross(leftHandForwardVector, leftHandRightVector).normalized;
 
-            _leftHandTarget.localRotation = LookRotation(leftThumbToWristVector, leftHandPalmNormal);
+                _leftHandTarget.localRotation = LookRotation(leftHandForwardVector, leftHandUpVector) * Quaternion.Euler(_handRotationOffset);
+            }
+            else
+            {
+                var leftHandWristToMiddle = _leftHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position - _leftHandLandmarks[(int)HandLandmark.Wrist].Position;
+                var leftHandPinkyToIndex = _leftHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position - _leftHandLandmarks[(int)HandLandmark.PinkyMcp].Position;
+                var leftHandUpVector = Vector3.Cross(leftHandPinkyToIndex, leftHandWristToMiddle).normalized;
+                var leftHandForwardVector = Vector3.Cross(leftHandUpVector, leftHandPinkyToIndex).normalized;
+
+                _leftHandTarget.localRotation = LookRotation(leftHandForwardVector, -leftHandUpVector) * Quaternion.Euler(_handRotationOffset);
+            }
 
 
             // --------------------------------------------------
             // Right Hand Rotation
             // --------------------------------------------------
 
-            var centerRightHandPosition = (_poseWorldLandmarks[(int)PoseLandmark.RightIndex].Position + _poseWorldLandmarks[(int)PoseLandmark.RightPinky].Position) / 2f;
-            var rightHandForwardVector = (centerRightHandPosition - _poseWorldLandmarks[(int)PoseLandmark.RightWrist].Position).normalized;
-            var rightHandSideVector = (_poseWorldLandmarks[(int)PoseLandmark.RightPinky].Position - _poseWorldLandmarks[(int)PoseLandmark.RightIndex].Position).normalized;
-            var rightHandPalmNormal = Vector3.Cross(rightHandSideVector, rightHandForwardVector).normalized;
-            var rightThumbToWristVector = (_poseWorldLandmarks[(int)PoseLandmark.RightThumb].Position - _poseWorldLandmarks[(int)PoseLandmark.RightWrist].Position).normalized;
+            if (!_activeRightHandLandmark)
+            {
+                var centerRightHandPosition = (_poseWorldLandmarks[(int)PoseLandmark.RightIndex].Position + _poseWorldLandmarks[(int)PoseLandmark.RightPinky].Position) / 2f;
+                var rightHandForwardVector = (centerRightHandPosition - _poseWorldLandmarks[(int)PoseLandmark.RightWrist].Position).normalized;
+                var rightHandRightVector = (_poseWorldLandmarks[(int)PoseLandmark.RightIndex].Position - _poseWorldLandmarks[(int)PoseLandmark.RightPinky].Position).normalized;
+                var rightHandUpVector = Vector3.Cross(-rightHandForwardVector, rightHandRightVector).normalized;
 
-            _rightHandTarget.localRotation = LookRotation(rightThumbToWristVector, -rightHandPalmNormal);
+                _rightHandTarget.localRotation = LookRotation(-rightHandForwardVector, rightHandUpVector) * Quaternion.Euler(_handRotationOffset);
+            }
+            else
+            {
+                var rightHandWristToMiddle = _rightHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position - _rightHandLandmarks[(int)HandLandmark.Wrist].Position;
+                var rightHandPinkyToIndex = _rightHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position - _rightHandLandmarks[(int)HandLandmark.PinkyMcp].Position;
+                var rightHandUpVector = Vector3.Cross(rightHandPinkyToIndex, rightHandWristToMiddle).normalized;
+                var rightHandForwardVector = Vector3.Cross(rightHandUpVector, rightHandPinkyToIndex).normalized;
+
+                _rightHandTarget.localRotation = LookRotation(-rightHandForwardVector, rightHandUpVector) * Quaternion.Euler(_handRotationOffset);
+            }
 
 
             // --------------------------------------------------
-            // Foot Rotations
+            // Foot Rotation
             // --------------------------------------------------
 
             var leftFootForwardVector = (_poseWorldLandmarks[(int)PoseLandmark.LeftFootIndex].Position - _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Position).normalized;
@@ -605,6 +622,9 @@ namespace PMC
             _leftFootTarget.localRotation = LookRotation(leftFootForwardVector, Vector3.up);
             _rightFootTarget.localRotation = LookRotation(rightFootForwardVector, Vector3.up);
 
+
+            // --------------------------------------------------
+            // Position
             // --------------------------------------------------
 
             _headTarget.localPosition = _poseWorldLandmarks[(int)PoseLandmark.Nose].Position;
@@ -628,7 +648,109 @@ namespace PMC
             _rightThighTarget.localPosition = _poseWorldLandmarks[(int)PoseLandmark.RightHip].Position;
         }
 
-        private void CalculateVRIK()
+        private void UpdateFinger()
+        {
+            if (_activeRightHandLandmark)
+            {
+                SetFingerRotationFromTo(HumanBodyBones.RightThumbProximal, HandLandmark.Wrist, HandLandmark.ThumbCmc, HandLandmark.ThumbMcp);
+                SetFingerRotationFromTo(HumanBodyBones.RightThumbIntermediate, HandLandmark.ThumbCmc, HandLandmark.ThumbMcp, HandLandmark.ThumbIp);
+                SetFingerRotationFromTo(HumanBodyBones.RightThumbDistal, HandLandmark.ThumbMcp, HandLandmark.ThumbIp, HandLandmark.ThumbTip);
+
+                SetFingerRotationFromTo(HumanBodyBones.RightIndexProximal, HandLandmark.Wrist, HandLandmark.IndexFingerMcp, HandLandmark.IndexFingerPip);
+                SetFingerRotationFromTo(HumanBodyBones.RightIndexIntermediate, HandLandmark.IndexFingerMcp, HandLandmark.IndexFingerPip, HandLandmark.IndexFingerDip);
+                SetFingerRotationFromTo(HumanBodyBones.RightIndexDistal, HandLandmark.IndexFingerPip, HandLandmark.IndexFingerDip, HandLandmark.IndexFingerTip);
+
+                SetFingerRotationFromTo(HumanBodyBones.RightMiddleProximal, HandLandmark.Wrist, HandLandmark.MiddleFingerMcp, HandLandmark.MiddleFingerPip);
+                SetFingerRotationFromTo(HumanBodyBones.RightMiddleIntermediate, HandLandmark.MiddleFingerMcp, HandLandmark.MiddleFingerPip, HandLandmark.MiddleFingerDip);
+                SetFingerRotationFromTo(HumanBodyBones.RightMiddleDistal, HandLandmark.MiddleFingerPip, HandLandmark.MiddleFingerDip, HandLandmark.MiddleFingerTip);
+
+                SetFingerRotationFromTo(HumanBodyBones.RightRingProximal, HandLandmark.Wrist, HandLandmark.RingFingerMcp, HandLandmark.RingFingerPip);
+                SetFingerRotationFromTo(HumanBodyBones.RightRingIntermediate, HandLandmark.RingFingerMcp, HandLandmark.RingFingerPip, HandLandmark.RingFingerDip);
+                SetFingerRotationFromTo(HumanBodyBones.RightRingDistal, HandLandmark.RingFingerPip, HandLandmark.RingFingerDip, HandLandmark.RingFingerTip);
+
+                SetFingerRotationFromTo(HumanBodyBones.RightLittleProximal, HandLandmark.Wrist, HandLandmark.PinkyMcp, HandLandmark.PinkyPip);
+                SetFingerRotationFromTo(HumanBodyBones.RightLittleIntermediate, HandLandmark.PinkyMcp, HandLandmark.PinkyPip, HandLandmark.PinkyDip);
+                SetFingerRotationFromTo(HumanBodyBones.RightLittleDistal, HandLandmark.PinkyPip, HandLandmark.PinkyDip, HandLandmark.PinkyTip);
+            }
+        }
+
+        private void SetFingerRotationFromTo(HumanBodyBones boneId, HandLandmark parentStartId, HandLandmark childStartId, HandLandmark childEndId)
+        {
+            var bone = _animator.GetBoneTransform(boneId);
+
+            if (bone == null || !_initialLocalRotations.ContainsKey(boneId)) return;
+
+            var isLeftHand = boneId.ToString().StartsWith("Left");
+            var landmarks = isLeftHand ? _leftHandLandmarks : _rightHandLandmarks;
+
+            // ----------------------------------------------------------------------
+            // 1. 方向ベクトルの計算
+            // ----------------------------------------------------------------------
+            // a) Forwardベクトル（回転後に指が向くべき方向）: 親の関節から子の関節へ
+            var forwardDirection = (landmarks[(int)childStartId].Position - landmarks[(int)parentStartId].Position).normalized;
+
+            // b) Upベクトル（ねじれを定義する基準となる方向）
+            // 手の平面からUpベクトルを計算するために、手首と指の付け根（MCP）のランドマークを使用します。
+
+            Vector3 upVector;
+            if (isLeftHand)
+            {
+                // 左手の甲の平面を基準にする
+                var wristToPinky = landmarks[(int)HandLandmark.PinkyMcp].Position - landmarks[(int)HandLandmark.Wrist].Position;
+                var wristToIndex = landmarks[(int)HandLandmark.IndexFingerMcp].Position - landmarks[(int)HandLandmark.Wrist].Position;
+
+                // 外積で平面に垂直なベクトルを計算 (左手のUpは通常、手のひら側を向く)
+                upVector = Vector3.Cross(wristToIndex, wristToPinky).normalized;
+            }
+            else
+            {
+                // 右手の甲の平面を基準にする
+                var wristToPinky = landmarks[(int)HandLandmark.PinkyMcp].Position - landmarks[(int)HandLandmark.Wrist].Position;
+                var wristToIndex = landmarks[(int)HandLandmark.IndexFingerMcp].Position - landmarks[(int)HandLandmark.Wrist].Position;
+
+                // 外積で平面に垂直なベクトルを計算 (右手のUpは通常、手の甲側を向く)
+                upVector = Vector3.Cross(wristToPinky, wristToIndex).normalized;
+            }
+
+            if (forwardDirection == Vector3.zero || upVector == Vector3.zero) return;
+
+
+            // ----------------------------------------------------------------------
+            // 2. LookRotationで目標回転を計算
+            // ----------------------------------------------------------------------
+            // forwardDirection: 指が向くべき方向（回転後のZ軸の目標）
+            // upVector: 指の曲げ方向（回転後のY軸の目標、またはその近く）
+            var targetRotation = LookRotation(forwardDirection, upVector);
+
+
+            // ----------------------------------------------------------------------
+            // 3. 初期回転を基準にローカル回転を適用
+            // ----------------------------------------------------------------------
+            // targetRotation (World Space)をローカル回転に変換するために、
+            // 親の回転の逆数を乗算して相対的な回転を取り出す必要がある場合がありますが、
+            // ここでは単純に初期回転を基準にした相対回転を適用する一般的なアプローチを取ります。
+
+            // Quaternion.Inverse(_animator.GetBoneTransform(HumanBodyBones.ParentOfThisBone).rotation) * targetRotation * _initialLocalRotations[boneId];
+            // のような複雑な計算が必要な場合もありますが、
+            // Simple IKでは、初期回転を基準にしたFromTo/LookRotationで十分なことも多いです。
+
+            // より安定させるため、FromToRotationのロジックに近づけて、
+            // 「親ボーンの初期回転」からの相対的なねじれを修正した回転として適用します。
+            // ※ここでは既存の FromToRotation の実装を LookRotation で置き換えるシンプルな対応とします。
+
+            // targetRotation: ワールド空間で目指すべき指の姿勢
+            // bone.parent.rotation: 親ボーンの現在のワールド回転
+
+            // ワールド姿勢をローカル姿勢に変換
+            Quaternion localTargetRotation = Quaternion.Inverse(bone.parent.rotation) * targetRotation;
+
+            // 初期ローカル回転にターゲットローカル回転を乗算
+            // ただし、LookRotationは絶対的なワールド回転を与えるため、
+            // ここではターゲットローカル回転を直接適用します。
+            bone.localRotation = localTargetRotation;
+        }
+
+        private void UpdateVRIK()
         {
             if (_autoWeight)
             {
@@ -693,7 +815,7 @@ namespace PMC
             }
         }
 
-        private void CalculateFBBIK()
+        private void UpdateFBBIK()
         {
             if (_autoWeight)
             {
@@ -774,21 +896,13 @@ namespace PMC
             }
         }
 
-        private void Calibration()
+        private void ExecuteCalibration()
         {
             if (_executeCalibration)
             {
                 var distance = Vector3.Distance(Vector3.zero, _poseWorldLandmarks[(int)PoseLandmark.Nose].Position);
 
-                if (_IKType == IKType.VRIK)
-                {
-                    _landmarkScale *= _scaleMip * _sittingHeight / distance;
-                }
-
-                if (_IKType == IKType.FBBIK)
-                {
-                    _landmarkScale *= _scaleMip * _sittingHeight / distance;
-                }
+                _landmarkScale *= _sittingHeight / distance;
 
                 _executeCalibration = false;
             }
@@ -797,6 +911,8 @@ namespace PMC
 
         private void OnPoseLandmarks(NormalizedLandmarkList landmarkList)
         {
+            _activePoseLandmark = landmarkList != null;
+
             if (landmarkList == null) return;
 
             var landmark = landmarkList.Landmark;
@@ -839,6 +955,8 @@ namespace PMC
 
         private void OnLeftHandLandmarks(NormalizedLandmarkList landmarkList)
         {
+            _activeLeftHandLandmark = landmarkList != null;
+
             if (landmarkList == null) return;
 
             var landmark = landmarkList.Landmark;
@@ -854,6 +972,29 @@ namespace PMC
                 if (_enableKalmanFilter)
                 {
                     _leftHandLandmarks[i].Position = _leftHandLandmarks[i].KalmanFilter.Update(_leftHandLandmarks[i].Position);
+                }
+            }
+        }
+
+        private void OnRightHandLandmarks(NormalizedLandmarkList landmarkList)
+        {
+            _activeRightHandLandmark = landmarkList != null;
+
+            if (landmarkList == null) return;
+
+            var landmark = landmarkList.Landmark;
+
+            if (landmark == null) return;
+
+            for (int i = 0; i < landmark.Count; i++)
+            {
+                _rightHandLandmarks[i].Set(landmark[i]);
+
+                _rightHandLandmarks[i].Position = Vector3.Scale(_rightHandLandmarks[i].Position, _landmarkScale);
+
+                if (_enableKalmanFilter)
+                {
+                    _rightHandLandmarks[i].Position = _rightHandLandmarks[i].KalmanFilter.Update(_rightHandLandmarks[i].Position);
                 }
             }
         }

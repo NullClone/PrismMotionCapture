@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace PMC.Editor
 {
+    [CanEditMultipleObjects]
     [CustomEditor(typeof(ImageSource))]
     sealed class ImageSourceEditor : UnityEditor.Editor
     {
