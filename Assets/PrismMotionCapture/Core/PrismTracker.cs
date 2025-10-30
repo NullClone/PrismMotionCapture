@@ -16,7 +16,7 @@ namespace PMC
     {
         // Fields
 
-        [Header("Input Settings")]
+        [Space]
         [SerializeField] private ImageSource _imageSource;
 
         [Header("Inference Settings")]
@@ -31,7 +31,7 @@ namespace PMC
         [SerializeField] private bool _enableSegmentation = false;
         [SerializeField] private bool _smoothSegmentation = false;
 
-        [Header("Debug")]
+        [Header("Debug Settings")]
         [SerializeField] private PoseWorldLandmarkListAnnotationController2 _poseWorldLandmarkListAnnotationController2;
         [SerializeField] private HandLandmarkListAnnotationController _handLandmarkListAnnotationController;
 
@@ -91,6 +91,7 @@ namespace PMC
             {
                 _handLandmarkListAnnotationController.rotationAngle = RotationAngle.Rotation180;
                 _handLandmarkListAnnotationController.isMirrored = true;
+                _handLandmarkListAnnotationController.VisualizeZ = true;
             }
         }
 

@@ -15,7 +15,7 @@ namespace Mediapipe.Unity
         {
             base.Start();
 
-            transform.localPosition = new Vector3(0, HipHeightMeter * Scale.y, 0);
+            //transform.localPosition = new Vector3(0, HipHeightMeter * Scale.y, 0);
         }
 
         public void DrawNow(IReadOnlyList<Landmark> target)

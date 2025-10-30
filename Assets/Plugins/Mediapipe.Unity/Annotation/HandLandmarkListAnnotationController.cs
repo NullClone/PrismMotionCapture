@@ -4,7 +4,7 @@ namespace Mediapipe.Unity
 {
     public class HandLandmarkListAnnotationController : AnnotationController<HandLandmarkListAnnotation>
     {
-        public bool _visualizeZ = false;
+        public bool VisualizeZ = false;
 
         private IReadOnlyList<NormalizedLandmark> _currentTarget;
 
@@ -46,7 +46,7 @@ namespace Mediapipe.Unity
         {
             isStale = false;
 
-            annotation.Draw(_currentTarget, _visualizeZ);
+            annotation.Draw(_currentTarget, VisualizeZ);
         }
     }
 }

@@ -14,16 +14,24 @@ namespace PMC
     {
         // Fields
 
+        [Space]
         [SerializeField] private PrismTracker _tracker;
+
+        [Header("IK Settings")]
         [SerializeField] private IKType _IKType = IKType.FBBIK;
         [SerializeField] private bool _enableMovement = true;
         [SerializeField] private bool _autoWeight = true;
+        [Space]
         [SerializeField] private Vector3 _landmarkScale = new(1f, 1f, -1f);
         [SerializeField] private Vector3 _handRotationOffset = new(0f, 90f, 0f);
         [SerializeField] private Vector3 _leftHandRotationOffset = new(0f, 90f, 0f);
+
+        [Header("Kalman Filter Settings")]
         [SerializeField] private bool _enableKalmanFilter = true;
         [SerializeField] private float _timeInterval = 0.45f;
         [SerializeField] private float _noise = 0.4f;
+
+        [Header("Calibration Settings")]
         [SerializeField] private bool _executeCalibration = false;
 
         private Animator _animator;
@@ -650,104 +658,50 @@ namespace PMC
 
         private void UpdateFinger()
         {
-            if (_activeRightHandLandmark)
+            if (_activeLeftHandLandmark)
             {
-                SetFingerRotationFromTo(HumanBodyBones.RightThumbProximal, HandLandmark.Wrist, HandLandmark.ThumbCmc, HandLandmark.ThumbMcp);
-                SetFingerRotationFromTo(HumanBodyBones.RightThumbIntermediate, HandLandmark.ThumbCmc, HandLandmark.ThumbMcp, HandLandmark.ThumbIp);
-                SetFingerRotationFromTo(HumanBodyBones.RightThumbDistal, HandLandmark.ThumbMcp, HandLandmark.ThumbIp, HandLandmark.ThumbTip);
+                SetLeftFingerRotation(HumanBodyBones.LeftThumbProximal, HandLandmark.Wrist, HandLandmark.ThumbCmc, HandLandmark.ThumbMcp);
+                SetLeftFingerRotation(HumanBodyBones.LeftThumbIntermediate, HandLandmark.ThumbCmc, HandLandmark.ThumbMcp, HandLandmark.ThumbIp);
+                SetLeftFingerRotation(HumanBodyBones.LeftThumbDistal, HandLandmark.ThumbMcp, HandLandmark.ThumbIp, HandLandmark.ThumbTip);
 
-                SetFingerRotationFromTo(HumanBodyBones.RightIndexProximal, HandLandmark.Wrist, HandLandmark.IndexFingerMcp, HandLandmark.IndexFingerPip);
-                SetFingerRotationFromTo(HumanBodyBones.RightIndexIntermediate, HandLandmark.IndexFingerMcp, HandLandmark.IndexFingerPip, HandLandmark.IndexFingerDip);
-                SetFingerRotationFromTo(HumanBodyBones.RightIndexDistal, HandLandmark.IndexFingerPip, HandLandmark.IndexFingerDip, HandLandmark.IndexFingerTip);
+                SetLeftFingerRotation(HumanBodyBones.LeftIndexProximal, HandLandmark.Wrist, HandLandmark.IndexFingerMcp, HandLandmark.IndexFingerPip);
+                SetLeftFingerRotation(HumanBodyBones.LeftIndexIntermediate, HandLandmark.IndexFingerMcp, HandLandmark.IndexFingerPip, HandLandmark.IndexFingerDip);
+                SetLeftFingerRotation(HumanBodyBones.LeftIndexDistal, HandLandmark.IndexFingerPip, HandLandmark.IndexFingerDip, HandLandmark.IndexFingerTip);
 
-                SetFingerRotationFromTo(HumanBodyBones.RightMiddleProximal, HandLandmark.Wrist, HandLandmark.MiddleFingerMcp, HandLandmark.MiddleFingerPip);
-                SetFingerRotationFromTo(HumanBodyBones.RightMiddleIntermediate, HandLandmark.MiddleFingerMcp, HandLandmark.MiddleFingerPip, HandLandmark.MiddleFingerDip);
-                SetFingerRotationFromTo(HumanBodyBones.RightMiddleDistal, HandLandmark.MiddleFingerPip, HandLandmark.MiddleFingerDip, HandLandmark.MiddleFingerTip);
+                SetLeftFingerRotation(HumanBodyBones.LeftMiddleProximal, HandLandmark.Wrist, HandLandmark.MiddleFingerMcp, HandLandmark.MiddleFingerPip);
+                SetLeftFingerRotation(HumanBodyBones.LeftMiddleIntermediate, HandLandmark.MiddleFingerMcp, HandLandmark.MiddleFingerPip, HandLandmark.MiddleFingerDip);
+                SetLeftFingerRotation(HumanBodyBones.LeftMiddleDistal, HandLandmark.MiddleFingerPip, HandLandmark.MiddleFingerDip, HandLandmark.MiddleFingerTip);
 
-                SetFingerRotationFromTo(HumanBodyBones.RightRingProximal, HandLandmark.Wrist, HandLandmark.RingFingerMcp, HandLandmark.RingFingerPip);
-                SetFingerRotationFromTo(HumanBodyBones.RightRingIntermediate, HandLandmark.RingFingerMcp, HandLandmark.RingFingerPip, HandLandmark.RingFingerDip);
-                SetFingerRotationFromTo(HumanBodyBones.RightRingDistal, HandLandmark.RingFingerPip, HandLandmark.RingFingerDip, HandLandmark.RingFingerTip);
+                SetLeftFingerRotation(HumanBodyBones.LeftRingProximal, HandLandmark.Wrist, HandLandmark.RingFingerMcp, HandLandmark.RingFingerPip);
+                SetLeftFingerRotation(HumanBodyBones.LeftRingIntermediate, HandLandmark.RingFingerMcp, HandLandmark.RingFingerPip, HandLandmark.RingFingerDip);
+                SetLeftFingerRotation(HumanBodyBones.LeftRingDistal, HandLandmark.RingFingerPip, HandLandmark.RingFingerDip, HandLandmark.RingFingerTip);
 
-                SetFingerRotationFromTo(HumanBodyBones.RightLittleProximal, HandLandmark.Wrist, HandLandmark.PinkyMcp, HandLandmark.PinkyPip);
-                SetFingerRotationFromTo(HumanBodyBones.RightLittleIntermediate, HandLandmark.PinkyMcp, HandLandmark.PinkyPip, HandLandmark.PinkyDip);
-                SetFingerRotationFromTo(HumanBodyBones.RightLittleDistal, HandLandmark.PinkyPip, HandLandmark.PinkyDip, HandLandmark.PinkyTip);
+                SetLeftFingerRotation(HumanBodyBones.LeftLittleProximal, HandLandmark.Wrist, HandLandmark.PinkyMcp, HandLandmark.PinkyPip);
+                SetLeftFingerRotation(HumanBodyBones.LeftLittleIntermediate, HandLandmark.PinkyMcp, HandLandmark.PinkyPip, HandLandmark.PinkyDip);
+                SetLeftFingerRotation(HumanBodyBones.LeftLittleDistal, HandLandmark.PinkyPip, HandLandmark.PinkyDip, HandLandmark.PinkyTip);
             }
         }
 
-        private void SetFingerRotationFromTo(HumanBodyBones boneId, HandLandmark parentStartId, HandLandmark childStartId, HandLandmark childEndId)
+        private void SetLeftFingerRotation(HumanBodyBones boneId, HandLandmark parentStartId, HandLandmark childStartId, HandLandmark childEndId)
         {
             var bone = _animator.GetBoneTransform(boneId);
 
             if (bone == null || !_initialLocalRotations.ContainsKey(boneId)) return;
 
-            var isLeftHand = boneId.ToString().StartsWith("Left");
-            var landmarks = isLeftHand ? _leftHandLandmarks : _rightHandLandmarks;
+            var forwardDirection = (_leftHandLandmarks[(int)childStartId].Position - _leftHandLandmarks[(int)parentStartId].Position).normalized;
+            var wristToPinky = _leftHandLandmarks[(int)HandLandmark.PinkyMcp].Position - _leftHandLandmarks[(int)HandLandmark.Wrist].Position;
+            var wristToIndex = _leftHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position - _leftHandLandmarks[(int)HandLandmark.Wrist].Position;
 
-            // ----------------------------------------------------------------------
-            // 1. 方向ベクトルの計算
-            // ----------------------------------------------------------------------
-            // a) Forwardベクトル（回転後に指が向くべき方向）: 親の関節から子の関節へ
-            var forwardDirection = (landmarks[(int)childStartId].Position - landmarks[(int)parentStartId].Position).normalized;
+            var upVector = Vector3.Cross(wristToPinky, wristToIndex).normalized;
 
-            // b) Upベクトル（ねじれを定義する基準となる方向）
-            // 手の平面からUpベクトルを計算するために、手首と指の付け根（MCP）のランドマークを使用します。
+            var rightHandWristToMiddle = _leftHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position - _leftHandLandmarks[(int)HandLandmark.Wrist].Position;
+            var rightHandPinkyToIndex = _leftHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position - _leftHandLandmarks[(int)HandLandmark.PinkyMcp].Position;
+            var rightHandUpVector = Vector3.Cross(rightHandPinkyToIndex, rightHandWristToMiddle).normalized;
+            var rightHandForwardVector = Vector3.Cross(rightHandUpVector, rightHandPinkyToIndex).normalized;
 
-            Vector3 upVector;
-            if (isLeftHand)
-            {
-                // 左手の甲の平面を基準にする
-                var wristToPinky = landmarks[(int)HandLandmark.PinkyMcp].Position - landmarks[(int)HandLandmark.Wrist].Position;
-                var wristToIndex = landmarks[(int)HandLandmark.IndexFingerMcp].Position - landmarks[(int)HandLandmark.Wrist].Position;
+            var targetRotation = LookRotation(forwardDirection, rightHandUpVector);
 
-                // 外積で平面に垂直なベクトルを計算 (左手のUpは通常、手のひら側を向く)
-                upVector = Vector3.Cross(wristToIndex, wristToPinky).normalized;
-            }
-            else
-            {
-                // 右手の甲の平面を基準にする
-                var wristToPinky = landmarks[(int)HandLandmark.PinkyMcp].Position - landmarks[(int)HandLandmark.Wrist].Position;
-                var wristToIndex = landmarks[(int)HandLandmark.IndexFingerMcp].Position - landmarks[(int)HandLandmark.Wrist].Position;
-
-                // 外積で平面に垂直なベクトルを計算 (右手のUpは通常、手の甲側を向く)
-                upVector = Vector3.Cross(wristToPinky, wristToIndex).normalized;
-            }
-
-            if (forwardDirection == Vector3.zero || upVector == Vector3.zero) return;
-
-
-            // ----------------------------------------------------------------------
-            // 2. LookRotationで目標回転を計算
-            // ----------------------------------------------------------------------
-            // forwardDirection: 指が向くべき方向（回転後のZ軸の目標）
-            // upVector: 指の曲げ方向（回転後のY軸の目標、またはその近く）
-            var targetRotation = LookRotation(forwardDirection, upVector);
-
-
-            // ----------------------------------------------------------------------
-            // 3. 初期回転を基準にローカル回転を適用
-            // ----------------------------------------------------------------------
-            // targetRotation (World Space)をローカル回転に変換するために、
-            // 親の回転の逆数を乗算して相対的な回転を取り出す必要がある場合がありますが、
-            // ここでは単純に初期回転を基準にした相対回転を適用する一般的なアプローチを取ります。
-
-            // Quaternion.Inverse(_animator.GetBoneTransform(HumanBodyBones.ParentOfThisBone).rotation) * targetRotation * _initialLocalRotations[boneId];
-            // のような複雑な計算が必要な場合もありますが、
-            // Simple IKでは、初期回転を基準にしたFromTo/LookRotationで十分なことも多いです。
-
-            // より安定させるため、FromToRotationのロジックに近づけて、
-            // 「親ボーンの初期回転」からの相対的なねじれを修正した回転として適用します。
-            // ※ここでは既存の FromToRotation の実装を LookRotation で置き換えるシンプルな対応とします。
-
-            // targetRotation: ワールド空間で目指すべき指の姿勢
-            // bone.parent.rotation: 親ボーンの現在のワールド回転
-
-            // ワールド姿勢をローカル姿勢に変換
-            Quaternion localTargetRotation = Quaternion.Inverse(bone.parent.rotation) * targetRotation;
-
-            // 初期ローカル回転にターゲットローカル回転を乗算
-            // ただし、LookRotationは絶対的なワールド回転を与えるため、
-            // ここではターゲットローカル回転を直接適用します。
-            bone.localRotation = localTargetRotation;
+            bone.localRotation = Quaternion.Inverse(bone.parent.rotation) * targetRotation * _initialLocalRotations[boneId];
         }
 
         private void UpdateVRIK()

@@ -3,8 +3,8 @@ using UnityEditor;
 namespace PMC.Editor
 {
     [CanEditMultipleObjects]
-    [CustomEditor(typeof(PrismAvatar))]
-    sealed class PrismAvatarEditor : UnityEditor.Editor
+    [CustomEditor(typeof(PrismTracker))]
+    sealed class PrismTrackerEditor : UnityEditor.Editor
     {
         public override void OnInspectorGUI()
         {
