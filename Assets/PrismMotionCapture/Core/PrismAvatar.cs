@@ -794,7 +794,7 @@ namespace PMC
             {
                 var bone = proximalBone + i;
 
-                if (_initialLocalRotations.ContainsKey(bone))
+                if (_initialLocalRotations.TryGetValue(bone, out Quaternion initialLocalRotation))
                 {
                     var transform = _animator.GetBoneTransform(bone);
 
@@ -808,11 +808,13 @@ namespace PMC
 
                     if (worldTargetDirection == Vector3.zero) continue;
 
-                    var deltaRotation = Quaternion.FromToRotation(_initialBoneDirections[bone], handWorldRotation * worldTargetDirection);
+                    var initialBoneLocalTargetDirection = Quaternion.Inverse(initialLocalRotation) * handWorldRotation * worldTargetDirection;
 
-                    transform.localRotation = _initialLocalRotations[bone] * deltaRotation;
+                    var deltaRotation = Quaternion.FromToRotation(_initialBoneDirections[bone], initialBoneLocalTargetDirection);
 
-                    handWorldRotation *= Quaternion.Inverse(deltaRotation);
+                    transform.localRotation = initialLocalRotation * deltaRotation;
+
+                    handWorldRotation = Quaternion.Inverse(transform.localRotation) * handWorldRotation;
                 }
             }
         }
