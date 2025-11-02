@@ -54,11 +54,6 @@ namespace PMC
         private Transform _leftThighTarget;
         private Transform _rightThighTarget;
 
-        private Landmark[] _poseLandmarks;
-        private Landmark[] _poseWorldLandmarks;
-        private Landmark[] _leftHandLandmarks;
-        private Landmark[] _rightHandLandmarks;
-
         private Vector3 _baseScale;
         private Vector3 _basePosition;
         private Vector3 _pelvisBasePosition;
@@ -68,9 +63,15 @@ namespace PMC
         private bool _activeLeftHandLandmark;
         private bool _activeRightHandLandmark;
 
+        private readonly Landmark[] _poseLandmarks = new Landmark[(int)PoseLandmark.Count];
+        private readonly Landmark[] _poseWorldLandmarks = new Landmark[(int)PoseLandmark.Count];
+        private readonly Landmark[] _leftHandLandmarks = new Landmark[(int)HandLandmark.Count];
+        private readonly Landmark[] _rightHandLandmarks = new Landmark[(int)HandLandmark.Count];
+
         private readonly Dictionary<HumanBodyBones, Quaternion> _initialLocalRotations = new();
         private readonly Dictionary<HumanBodyBones, Quaternion> _inverseRotations = new();
         private readonly Dictionary<HumanBodyBones, Vector3> _initialBoneDirections = new();
+
         private readonly HumanBodyBones[] FingerBones = new HumanBodyBones[]
         {
             HumanBodyBones.LeftLittleDistal,
@@ -143,11 +144,6 @@ namespace PMC
                     _FBBIK = gameObject.AddComponent<FullBodyBipedIK>();
                 }
             }
-
-            _poseLandmarks = new Landmark[(int)PoseLandmark.Count];
-            _poseWorldLandmarks = new Landmark[(int)PoseLandmark.Count];
-            _leftHandLandmarks = new Landmark[(int)HandLandmark.Count];
-            _rightHandLandmarks = new Landmark[(int)HandLandmark.Count];
 
             for (int i = 0; i < _poseLandmarks.Length; i++)
             {
