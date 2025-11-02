@@ -30,9 +30,6 @@ namespace PMC
         [SerializeField] private float _timeInterval = 0.45f;
         [SerializeField] private float _noise = 0.4f;
 
-        [Header("Calibration Settings")]
-        [SerializeField] private bool _executeCalibration = false;
-
         private Animator _animator;
 
         private VRIK _VRIK;
@@ -110,6 +107,17 @@ namespace PMC
 
 
         // Methods
+
+        [ContextMenu("Execute Calibration (Play Mode Only)")]
+        public void ExecuteCalibration()
+        {
+            if (!Application.isPlaying) return;
+
+            var distance = Vector3.Distance(Vector3.zero, _poseWorldLandmarks[(int)PoseLandmark.Nose].Position);
+
+            _landmarkScale *= _sittingHeight / distance;
+        }
+
 
         private void Awake()
         {
@@ -231,14 +239,6 @@ namespace PMC
 
                 InitializeFBBIK();
             }
-
-            _executeCalibration = false;
-        }
-
-        private void Update()
-        {
-            // Editor Only
-            ExecuteCalibration();
         }
 
         private void OnDestroy()
@@ -248,7 +248,7 @@ namespace PMC
                 _tracker.OnPoseLandmarks -= OnPoseLandmarks;
                 _tracker.OnPoseWorldLandmarks -= OnPoseWorldLandmarks;
                 _tracker.OnLeftHandLandmarks -= OnLeftHandLandmarks;
-                _tracker.OnRightHandLandmarks += OnRightHandLandmarks;
+                _tracker.OnRightHandLandmarks -= OnRightHandLandmarks;
             }
 
             if (_IKType == IKType.VRIK)
@@ -988,19 +988,6 @@ namespace PMC
                 }
             }
         }
-
-        private void ExecuteCalibration()
-        {
-            if (_executeCalibration)
-            {
-                var distance = Vector3.Distance(Vector3.zero, _poseWorldLandmarks[(int)PoseLandmark.Nose].Position);
-
-                _landmarkScale *= _sittingHeight / distance;
-
-                _executeCalibration = false;
-            }
-        }
-
 
         private void OnPoseLandmarks(NormalizedLandmarkList landmarkList)
         {
