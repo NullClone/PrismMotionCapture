@@ -3,7 +3,6 @@ using RootMotion;
 using RootMotion.FinalIK;
 using System.Collections.Generic;
 using UnityEngine;
-using Color = UnityEngine.Color;
 
 namespace PMC
 {
@@ -71,40 +70,6 @@ namespace PMC
         private readonly Dictionary<HumanBodyBones, Quaternion> _initialLocalRotations = new();
         private readonly Dictionary<HumanBodyBones, Quaternion> _inverseRotations = new();
         private readonly Dictionary<HumanBodyBones, Vector3> _initialBoneDirections = new();
-
-        private readonly HumanBodyBones[] FingerBones = new HumanBodyBones[]
-        {
-            HumanBodyBones.LeftLittleDistal,
-            HumanBodyBones.LeftLittleIntermediate,
-            HumanBodyBones.LeftLittleProximal,
-            HumanBodyBones.LeftRingDistal,
-            HumanBodyBones.LeftRingIntermediate,
-            HumanBodyBones.LeftRingProximal,
-            HumanBodyBones.LeftMiddleDistal,
-            HumanBodyBones.LeftMiddleIntermediate,
-            HumanBodyBones.LeftMiddleProximal,
-            HumanBodyBones.LeftIndexDistal,
-            HumanBodyBones.LeftIndexIntermediate,
-            HumanBodyBones.LeftIndexProximal,
-            HumanBodyBones.LeftThumbDistal,
-            HumanBodyBones.LeftThumbIntermediate,
-            HumanBodyBones.LeftThumbProximal,
-            HumanBodyBones.RightLittleDistal,
-            HumanBodyBones.RightLittleIntermediate,
-            HumanBodyBones.RightLittleProximal,
-            HumanBodyBones.RightRingDistal,
-            HumanBodyBones.RightRingIntermediate,
-            HumanBodyBones.RightRingProximal,
-            HumanBodyBones.RightMiddleDistal,
-            HumanBodyBones.RightMiddleIntermediate,
-            HumanBodyBones.RightMiddleProximal,
-            HumanBodyBones.RightIndexDistal,
-            HumanBodyBones.RightIndexIntermediate,
-            HumanBodyBones.RightIndexProximal,
-            HumanBodyBones.RightThumbDistal,
-            HumanBodyBones.RightThumbIntermediate,
-            HumanBodyBones.RightThumbProximal,
-        };
 
 
         // Methods
@@ -258,32 +223,6 @@ namespace PMC
             }
         }
 
-        private void OnDrawGizmos()
-        {
-            if (!Application.isPlaying) return;
-
-            if (_activeLeftHandLandmark)
-            {
-                var leftHandWristToMiddle = _leftHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position - _leftHandLandmarks[(int)HandLandmark.Wrist].Position;
-                var leftHandPinkyToIndex = _leftHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position - _leftHandLandmarks[(int)HandLandmark.PinkyMcp].Position;
-                var leftHandUpVector = Vector3.Cross(leftHandPinkyToIndex, leftHandWristToMiddle).normalized;
-                var leftHandForwardVector = Vector3.Cross(leftHandUpVector, leftHandPinkyToIndex).normalized;
-
-                var rotation = LookRotation(leftHandForwardVector, -leftHandUpVector) * Quaternion.Euler(_handRotationOffset);
-
-                var length = 0.25f;
-
-                Gizmos.color = new Color(0f, 0f, 1f, 1f);
-                Gizmos.DrawRay(_animator.GetBoneTransform(HumanBodyBones.LeftHand).position, rotation * (length * Vector3.forward));
-
-                Gizmos.color = new Color(0f, 1f, 0f, 1f);
-                Gizmos.DrawRay(_animator.GetBoneTransform(HumanBodyBones.LeftHand).position, rotation * (length * Vector3.up));
-
-                Gizmos.color = new Color(1f, 0f, 0f, 1f);
-                Gizmos.DrawRay(_animator.GetBoneTransform(HumanBodyBones.LeftHand).position, rotation * (length * Vector3.right));
-            }
-        }
-
         private void OnPreVRIK()
         {
             if (_activePoseLandmark)
@@ -292,6 +231,8 @@ namespace PMC
 
                 UpdateVRIK();
             }
+
+            UpdateFinger();
         }
 
         private void OnPreFBBIK()
@@ -496,7 +437,39 @@ namespace PMC
 
         private void InitializeFinger()
         {
-            foreach (var bone in FingerBones)
+            foreach (var bone in new HumanBodyBones[]
+                {
+                    HumanBodyBones.LeftLittleDistal,
+                    HumanBodyBones.LeftLittleIntermediate,
+                    HumanBodyBones.LeftLittleProximal,
+                    HumanBodyBones.LeftRingDistal,
+                    HumanBodyBones.LeftRingIntermediate,
+                    HumanBodyBones.LeftRingProximal,
+                    HumanBodyBones.LeftMiddleDistal,
+                    HumanBodyBones.LeftMiddleIntermediate,
+                    HumanBodyBones.LeftMiddleProximal,
+                    HumanBodyBones.LeftIndexDistal,
+                    HumanBodyBones.LeftIndexIntermediate,
+                    HumanBodyBones.LeftIndexProximal,
+                    HumanBodyBones.LeftThumbDistal,
+                    HumanBodyBones.LeftThumbIntermediate,
+                    HumanBodyBones.LeftThumbProximal,
+                    HumanBodyBones.RightLittleDistal,
+                    HumanBodyBones.RightLittleIntermediate,
+                    HumanBodyBones.RightLittleProximal,
+                    HumanBodyBones.RightRingDistal,
+                    HumanBodyBones.RightRingIntermediate,
+                    HumanBodyBones.RightRingProximal,
+                    HumanBodyBones.RightMiddleDistal,
+                    HumanBodyBones.RightMiddleIntermediate,
+                    HumanBodyBones.RightMiddleProximal,
+                    HumanBodyBones.RightIndexDistal,
+                    HumanBodyBones.RightIndexIntermediate,
+                    HumanBodyBones.RightIndexProximal,
+                    HumanBodyBones.RightThumbDistal,
+                    HumanBodyBones.RightThumbIntermediate,
+                    HumanBodyBones.RightThumbProximal,
+                })
             {
                 var transform = _animator.GetBoneTransform(bone);
 
@@ -794,7 +767,7 @@ namespace PMC
         {
             for (int i = 0; i < 3; i++)
             {
-                HumanBodyBones bone = proximalBone + i;
+                var bone = proximalBone + i;
 
                 if (_initialLocalRotations.ContainsKey(bone))
                 {
