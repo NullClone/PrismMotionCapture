@@ -59,6 +59,8 @@ namespace PMC
         private Vector3 _baseScale;
         private Vector3 _basePosition;
         private Vector3 _pelvisBasePosition;
+        private Quaternion _inverseLeftHandRotation;
+        private Quaternion _inverseRightHandRotation;
 
         private float _sittingHeight;
         private bool _activePoseLandmark;
@@ -71,7 +73,6 @@ namespace PMC
         private readonly Landmark[] _rightHandLandmarks = new Landmark[(int)HandLandmark.Count];
 
         private readonly Dictionary<HumanBodyBones, Quaternion> _initialLocalRotations = new();
-        private readonly Dictionary<HumanBodyBones, Quaternion> _inverseRotations = new();
         private readonly Dictionary<HumanBodyBones, Vector3> _initialBoneDirections = new();
 
 
@@ -535,13 +536,8 @@ namespace PMC
                 _initialLocalRotations.TryAdd(HumanBodyBones.LeftHand, leftHandTransform.localRotation);
 
                 var forward = (leftHandTransform.position - lMidProx.position).normalized;
-                var up = leftHandTransform.up;
 
-                if (forward != Vector3.zero && up != Vector3.zero)
-                {
-                    _inverseRotations.TryAdd(HumanBodyBones.LeftHand,
-                        Quaternion.Inverse(Quaternion.LookRotation(forward, up)) * leftHandTransform.rotation);
-                }
+                _inverseLeftHandRotation = Quaternion.Inverse(LookRotation(forward, leftHandTransform.up)) * leftHandTransform.rotation;
             }
 
             if (rightHandTransform != null && rMidProx != null)
@@ -549,13 +545,8 @@ namespace PMC
                 _initialLocalRotations.TryAdd(HumanBodyBones.RightHand, rightHandTransform.localRotation);
 
                 var forward = (rightHandTransform.position - rMidProx.position).normalized;
-                var up = rightHandTransform.up;
 
-                if (forward != Vector3.zero && up != Vector3.zero)
-                {
-                    _inverseRotations.TryAdd(HumanBodyBones.RightHand,
-                        Quaternion.Inverse(Quaternion.LookRotation(forward, up)) * rightHandTransform.rotation);
-                }
+                _inverseRightHandRotation = Quaternion.Inverse(LookRotation(forward, rightHandTransform.up)) * rightHandTransform.rotation;
             }
         }
 
@@ -715,76 +706,48 @@ namespace PMC
             {
                 var lHandTransform = _animator.GetBoneTransform(HumanBodyBones.LeftHand);
 
-                if (lHandTransform != null && _inverseRotations.TryGetValue(HumanBodyBones.LeftHand, out var invRot))
+                if (lHandTransform != null)
                 {
-                    var lHandPos = _leftHandLandmarks[(int)HandLandmark.Wrist].Position;
-                    var lMidMcpPos = _leftHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position;
-                    var lIndexMcpPos = _leftHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position;
-                    var lPinkyMcpPos = _leftHandLandmarks[(int)HandLandmark.PinkyMcp].Position;
+                    var lHandUp = TriangleNormal(
+                        _leftHandLandmarks[(int)HandLandmark.Wrist].Position,
+                        _leftHandLandmarks[(int)HandLandmark.PinkyMcp].Position,
+                        _leftHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position);
+                    var lHandForward = (_leftHandLandmarks[(int)HandLandmark.Wrist].Position - _leftHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
 
-                    var lHandUp = TriangleNormal(lHandPos, lPinkyMcpPos, lIndexMcpPos);
-                    var lHandForward = (lHandPos - lMidMcpPos).normalized;
-
-                    lHandTransform.rotation = LookRotation(lHandForward, lHandUp) * invRot;
+                    lHandTransform.rotation = LookRotation(lHandForward, lHandUp) * _inverseLeftHandRotation;
                 }
 
                 var invLeftHandWorldRot = Quaternion.Inverse(lHandTransform.rotation);
 
                 ComputeFingerRotation(HumanBodyBones.LeftThumbProximal, HandLandmark.ThumbCmc, invLeftHandWorldRot);
-
-                ApplyFingerAngle(HumanBodyBones.LeftIndexProximal, HandLandmark.Wrist, HandLandmark.IndexFingerMcp, HandLandmark.IndexFingerPip);
-                ApplyFingerAngle(HumanBodyBones.LeftIndexIntermediate, HandLandmark.IndexFingerMcp, HandLandmark.IndexFingerPip, HandLandmark.IndexFingerDip);
-                ApplyFingerAngle(HumanBodyBones.LeftIndexDistal, HandLandmark.IndexFingerPip, HandLandmark.IndexFingerDip, HandLandmark.IndexFingerTip);
-
-                ApplyFingerAngle(HumanBodyBones.LeftMiddleProximal, HandLandmark.Wrist, HandLandmark.MiddleFingerMcp, HandLandmark.MiddleFingerPip);
-                ApplyFingerAngle(HumanBodyBones.LeftMiddleIntermediate, HandLandmark.MiddleFingerMcp, HandLandmark.MiddleFingerPip, HandLandmark.MiddleFingerDip);
-                ApplyFingerAngle(HumanBodyBones.LeftMiddleDistal, HandLandmark.MiddleFingerPip, HandLandmark.MiddleFingerDip, HandLandmark.MiddleFingerTip);
-
-                ApplyFingerAngle(HumanBodyBones.LeftRingProximal, HandLandmark.Wrist, HandLandmark.RingFingerMcp, HandLandmark.RingFingerPip);
-                ApplyFingerAngle(HumanBodyBones.LeftRingIntermediate, HandLandmark.RingFingerMcp, HandLandmark.RingFingerPip, HandLandmark.RingFingerDip);
-                ApplyFingerAngle(HumanBodyBones.LeftRingDistal, HandLandmark.RingFingerPip, HandLandmark.RingFingerDip, HandLandmark.RingFingerTip);
-
-                ApplyFingerAngle(HumanBodyBones.LeftLittleProximal, HandLandmark.Wrist, HandLandmark.PinkyMcp, HandLandmark.PinkyPip);
-                ApplyFingerAngle(HumanBodyBones.LeftLittleIntermediate, HandLandmark.PinkyMcp, HandLandmark.PinkyPip, HandLandmark.PinkyDip);
-                ApplyFingerAngle(HumanBodyBones.LeftLittleDistal, HandLandmark.PinkyPip, HandLandmark.PinkyDip, HandLandmark.PinkyTip);
+                ComputeFingerRotation(HumanBodyBones.LeftIndexProximal, HandLandmark.IndexFingerMcp, invLeftHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.LeftMiddleProximal, HandLandmark.MiddleFingerMcp, invLeftHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.LeftRingProximal, HandLandmark.RingFingerMcp, invLeftHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.LeftLittleProximal, HandLandmark.PinkyMcp, invLeftHandWorldRot);
             }
 
             if (_activeRightHandLandmark)
             {
                 var rHandTransform = _animator.GetBoneTransform(HumanBodyBones.RightHand);
 
-                if (rHandTransform != null && _inverseRotations.TryGetValue(HumanBodyBones.RightHand, out var invRot))
+                if (rHandTransform != null)
                 {
-                    var rHandPos = _rightHandLandmarks[(int)HandLandmark.Wrist].Position;
-                    var rMidMcpPos = _rightHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position;
-                    var rIndexMcpPos = _rightHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position;
-                    var rPinkyMcpPos = _rightHandLandmarks[(int)HandLandmark.PinkyMcp].Position;
+                    var rHandUp = TriangleNormal(
+                        _rightHandLandmarks[(int)HandLandmark.Wrist].Position,
+                        _rightHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position,
+                        _rightHandLandmarks[(int)HandLandmark.PinkyMcp].Position);
+                    var rHandForward = (_rightHandLandmarks[(int)HandLandmark.Wrist].Position - _rightHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
 
-                    var rHandUp = TriangleNormal(rHandPos, rIndexMcpPos, rPinkyMcpPos);
-                    var rHandForward = (rHandPos - rMidMcpPos).normalized;
-
-                    rHandTransform.rotation = LookRotation(rHandForward, rHandUp) * invRot;
+                    rHandTransform.rotation = LookRotation(rHandForward, rHandUp) * _inverseRightHandRotation;
                 }
 
                 var invRightHandWorldRot = Quaternion.Inverse(rHandTransform.rotation);
 
                 ComputeFingerRotation(HumanBodyBones.RightThumbProximal, HandLandmark.ThumbCmc, invRightHandWorldRot);
-
-                ApplyFingerAngle(HumanBodyBones.RightIndexProximal, HandLandmark.Wrist, HandLandmark.IndexFingerMcp, HandLandmark.IndexFingerPip);
-                ApplyFingerAngle(HumanBodyBones.RightIndexIntermediate, HandLandmark.IndexFingerMcp, HandLandmark.IndexFingerPip, HandLandmark.IndexFingerDip);
-                ApplyFingerAngle(HumanBodyBones.RightIndexDistal, HandLandmark.IndexFingerPip, HandLandmark.IndexFingerDip, HandLandmark.IndexFingerTip);
-
-                ApplyFingerAngle(HumanBodyBones.RightMiddleProximal, HandLandmark.Wrist, HandLandmark.MiddleFingerMcp, HandLandmark.MiddleFingerPip);
-                ApplyFingerAngle(HumanBodyBones.RightMiddleIntermediate, HandLandmark.MiddleFingerMcp, HandLandmark.MiddleFingerPip, HandLandmark.MiddleFingerDip);
-                ApplyFingerAngle(HumanBodyBones.RightMiddleDistal, HandLandmark.MiddleFingerPip, HandLandmark.MiddleFingerDip, HandLandmark.MiddleFingerTip);
-
-                ApplyFingerAngle(HumanBodyBones.RightRingProximal, HandLandmark.Wrist, HandLandmark.RingFingerMcp, HandLandmark.RingFingerPip);
-                ApplyFingerAngle(HumanBodyBones.RightRingIntermediate, HandLandmark.RingFingerMcp, HandLandmark.RingFingerPip, HandLandmark.RingFingerDip);
-                ApplyFingerAngle(HumanBodyBones.RightRingDistal, HandLandmark.RingFingerPip, HandLandmark.RingFingerDip, HandLandmark.RingFingerTip);
-
-                ApplyFingerAngle(HumanBodyBones.RightLittleProximal, HandLandmark.Wrist, HandLandmark.PinkyMcp, HandLandmark.PinkyPip);
-                ApplyFingerAngle(HumanBodyBones.RightLittleIntermediate, HandLandmark.PinkyMcp, HandLandmark.PinkyPip, HandLandmark.PinkyDip);
-                ApplyFingerAngle(HumanBodyBones.RightLittleDistal, HandLandmark.PinkyPip, HandLandmark.PinkyDip, HandLandmark.PinkyTip);
+                ComputeFingerRotation(HumanBodyBones.RightIndexProximal, HandLandmark.IndexFingerMcp, invRightHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.RightMiddleProximal, HandLandmark.MiddleFingerMcp, invRightHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.RightRingProximal, HandLandmark.RingFingerMcp, invRightHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.RightLittleProximal, HandLandmark.PinkyMcp, invRightHandWorldRot);
             }
         }
 
@@ -816,26 +779,6 @@ namespace PMC
 
                     handWorldRotation = Quaternion.Inverse(transform.localRotation) * handWorldRotation;
                 }
-            }
-        }
-
-        private void ApplyFingerAngle(HumanBodyBones bone, HandLandmark parentLandmark, HandLandmark jointLandmark, HandLandmark childLandmark)
-        {
-            var transform = _animator.GetBoneTransform(bone);
-
-            if (transform == null) return;
-
-            var isRightHand = bone.ToString().StartsWith("Right");
-
-            var landmarks = isRightHand ? _rightHandLandmarks : _leftHandLandmarks;
-
-            var angle = Mathf.Min(Vector3.Angle(
-                landmarks[(int)jointLandmark].Position - landmarks[(int)parentLandmark].Position,
-                landmarks[(int)childLandmark].Position - landmarks[(int)jointLandmark].Position), 90f);
-
-            if (_initialLocalRotations.TryGetValue(bone, out Quaternion initRot))
-            {
-                transform.localRotation = initRot * Quaternion.Euler(0, 0, isRightHand ? -angle : angle);
             }
         }
 
