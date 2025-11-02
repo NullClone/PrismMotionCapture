@@ -18,6 +18,7 @@ namespace PMC
 
         [Header("IK Settings")]
         [SerializeField] private IKType _IKType = IKType.FBBIK;
+        [SerializeField] private bool _enableTwistRelaxer = true;
         [SerializeField] private bool _enableMovement = true;
         [SerializeField] private bool _autoWeight = true;
         [Space]
@@ -36,6 +37,8 @@ namespace PMC
 
         private FullBodyBipedIK _FBBIK;
         private FBBIKHeadEffector _headEffector;
+
+        private TwistRelaxer _twistRelaxer;
 
         private Transform _root;
         private Transform _headTarget;
@@ -107,6 +110,14 @@ namespace PMC
                 if (!gameObject.TryGetComponent(out _FBBIK))
                 {
                     _FBBIK = gameObject.AddComponent<FullBodyBipedIK>();
+                }
+            }
+
+            if (_enableTwistRelaxer && _IKType == IKType.FBBIK)
+            {
+                if (!gameObject.TryGetComponent(out _twistRelaxer))
+                {
+                    _twistRelaxer = gameObject.AddComponent<TwistRelaxer>();
                 }
             }
 
@@ -431,6 +442,20 @@ namespace PMC
             _headEffector.rotationWeight = 1f;
             _headEffector.bodyClampWeight = 0f;
             _headEffector.headClampWeight = 0f;
+
+            if (_enableTwistRelaxer)
+            {
+                _twistRelaxer.ik = _FBBIK;
+                _twistRelaxer.twistSolvers = new TwistSolver[4];
+                _twistRelaxer.twistSolvers[0] = new TwistSolver(_FBBIK.references.leftUpperArm);
+                _twistRelaxer.twistSolvers[1] = new TwistSolver(_FBBIK.references.rightUpperArm);
+                _twistRelaxer.twistSolvers[2] = new TwistSolver(_FBBIK.references.leftForearm);
+                _twistRelaxer.twistSolvers[3] = new TwistSolver(_FBBIK.references.rightForearm);
+                _twistRelaxer.twistSolvers[2].children = new Transform[1] { _FBBIK.references.leftHand };
+                _twistRelaxer.twistSolvers[3].children = new Transform[1] { _FBBIK.references.rightHand };
+                _twistRelaxer.twistSolvers[2].parentChildCrossfade = 1f;
+                _twistRelaxer.twistSolvers[3].parentChildCrossfade = 1f;
+            }
 
             _FBBIK.solver.IKPositionWeight = 1f;
         }
