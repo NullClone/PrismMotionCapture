@@ -731,16 +731,13 @@ namespace PMC
             {
                 var lHandTransform = _animator.GetBoneTransform(HumanBodyBones.LeftHand);
 
-                if (lHandTransform != null)
-                {
-                    var lHandUp = TriangleNormal(
-                        _leftHandLandmarks[(int)HandLandmark.Wrist].Position,
-                        _leftHandLandmarks[(int)HandLandmark.PinkyMcp].Position,
-                        _leftHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position);
-                    var lHandForward = (_leftHandLandmarks[(int)HandLandmark.Wrist].Position - _leftHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
+                var lHandUp = TriangleNormal(
+                                        _leftHandLandmarks[(int)HandLandmark.Wrist].Position,
+                                        _leftHandLandmarks[(int)HandLandmark.PinkyMcp].Position,
+                                        _leftHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position);
+                var lHandForward = (_leftHandLandmarks[(int)HandLandmark.Wrist].Position - _leftHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
 
-                    lHandTransform.rotation = LookRotation(lHandForward, lHandUp) * _inverseLeftHandRotation;
-                }
+                lHandTransform.rotation = LookRotation(lHandForward, lHandUp) * _inverseLeftHandRotation;
 
                 var invLeftHandWorldRot = Quaternion.Inverse(lHandTransform.rotation);
 
@@ -755,16 +752,13 @@ namespace PMC
             {
                 var rHandTransform = _animator.GetBoneTransform(HumanBodyBones.RightHand);
 
-                if (rHandTransform != null)
-                {
-                    var rHandUp = TriangleNormal(
-                        _rightHandLandmarks[(int)HandLandmark.Wrist].Position,
-                        _rightHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position,
-                        _rightHandLandmarks[(int)HandLandmark.PinkyMcp].Position);
-                    var rHandForward = (_rightHandLandmarks[(int)HandLandmark.Wrist].Position - _rightHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
+                var rHandUp = TriangleNormal(
+                                        _rightHandLandmarks[(int)HandLandmark.Wrist].Position,
+                                        _rightHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position,
+                                        _rightHandLandmarks[(int)HandLandmark.PinkyMcp].Position);
+                var rHandForward = (_rightHandLandmarks[(int)HandLandmark.Wrist].Position - _rightHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
 
-                    rHandTransform.rotation = LookRotation(rHandForward, rHandUp) * _inverseRightHandRotation;
-                }
+                rHandTransform.rotation = LookRotation(rHandForward, rHandUp) * _inverseRightHandRotation;
 
                 var invRightHandWorldRot = Quaternion.Inverse(rHandTransform.rotation);
 
@@ -773,37 +767,6 @@ namespace PMC
                 ComputeFingerRotation(HumanBodyBones.RightMiddleProximal, HandLandmark.MiddleFingerMcp, invRightHandWorldRot);
                 ComputeFingerRotation(HumanBodyBones.RightRingProximal, HandLandmark.RingFingerMcp, invRightHandWorldRot);
                 ComputeFingerRotation(HumanBodyBones.RightLittleProximal, HandLandmark.PinkyMcp, invRightHandWorldRot);
-            }
-        }
-
-        private void ComputeFingerRotation(HumanBodyBones proximalBone, HandLandmark firstLandmark, Quaternion handWorldRotation)
-        {
-            for (int i = 0; i < 3; i++)
-            {
-                var bone = proximalBone + i;
-
-                if (_initialLocalRotations.TryGetValue(bone, out Quaternion initialLocalRotation))
-                {
-                    var transform = _animator.GetBoneTransform(bone);
-
-                    if (transform == null) continue;
-
-                    var isRightHand = bone.ToString().StartsWith("Right");
-
-                    var landmarks = isRightHand ? _rightHandLandmarks : _leftHandLandmarks;
-
-                    var worldTargetDirection = (landmarks[(int)firstLandmark + i + 1].Position - landmarks[(int)firstLandmark + i].Position).normalized;
-
-                    if (worldTargetDirection == Vector3.zero) continue;
-
-                    var initialBoneLocalTargetDirection = Quaternion.Inverse(initialLocalRotation) * handWorldRotation * worldTargetDirection;
-
-                    var deltaRotation = Quaternion.FromToRotation(_initialBoneDirections[bone], initialBoneLocalTargetDirection);
-
-                    transform.localRotation = initialLocalRotation * deltaRotation;
-
-                    handWorldRotation = Quaternion.Inverse(transform.localRotation) * handWorldRotation;
-                }
             }
         }
 
@@ -949,6 +912,35 @@ namespace PMC
                 {
                     _FBBIK.solver.rightThighEffector.positionWeight = 0f;
                     _FBBIK.solver.rightThighEffector.rotationWeight = 0f;
+                }
+            }
+        }
+
+        private void ComputeFingerRotation(HumanBodyBones proximalBone, HandLandmark firstLandmark, Quaternion handWorldRotation)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                var bone = proximalBone + i;
+
+                if (_initialLocalRotations.TryGetValue(bone, out Quaternion initialLocalRotation))
+                {
+                    var transform = _animator.GetBoneTransform(bone);
+
+                    if (transform == null) continue;
+
+                    var isRightHand = bone.ToString().StartsWith("Right");
+
+                    var landmarks = isRightHand ? _rightHandLandmarks : _leftHandLandmarks;
+
+                    var worldTargetDirection = (landmarks[(int)firstLandmark + i + 1].Position - landmarks[(int)firstLandmark + i].Position).normalized;
+
+                    if (worldTargetDirection == Vector3.zero) continue;
+
+                    var initialBoneLocalTargetDirection = Quaternion.Inverse(initialLocalRotation) * handWorldRotation * worldTargetDirection;
+
+                    transform.localRotation = Quaternion.FromToRotation(_initialBoneDirections[bone], initialBoneLocalTargetDirection) * initialLocalRotation;
+
+                    handWorldRotation = Quaternion.Inverse(transform.localRotation) * handWorldRotation;
                 }
             }
         }
