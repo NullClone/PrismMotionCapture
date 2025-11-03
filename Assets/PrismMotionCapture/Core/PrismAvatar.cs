@@ -13,19 +13,13 @@ namespace PMC
     {
         // Fields
 
-        [Space]
         [SerializeField] private PrismTracker _tracker;
-
-        [Header("IK Settings")]
         [SerializeField] private IKType _IKType = IKType.FBBIK;
         [SerializeField] private bool _enableTwistRelaxer = true;
         [SerializeField] private bool _enableMovement = true;
         [SerializeField] private bool _autoWeight = true;
-        [Space]
         [SerializeField] private Vector3 _landmarkScale = new(1f, 1f, -1f);
         [SerializeField] private Vector3 _handRotationOffset = new(0f, 90f, 0f);
-
-        [Header("Kalman Filter Settings")]
         [SerializeField] private bool _enableKalmanFilter = true;
         [SerializeField] private float _timeInterval = 0.45f;
         [SerializeField] private float _noise = 0.4f;
