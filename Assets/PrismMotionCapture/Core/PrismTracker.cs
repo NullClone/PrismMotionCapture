@@ -33,7 +33,7 @@ namespace PMC
 
         [Header("Debug Settings")]
         [SerializeField] private PoseWorldLandmarkListAnnotationController2 _poseWorldLandmarkListAnnotationController2;
-        [SerializeField] private HandLandmarkListAnnotationController _handLandmarkListAnnotationController;
+        [SerializeField] private HolisticLandmarkListAnnotationController _holisticLandmarkListAnnotationController;
 
         [SerializeField, HideInInspector] private TextAsset _CPUConfig;
         [SerializeField, HideInInspector] private TextAsset _GPUConfig;
@@ -81,8 +81,11 @@ namespace PMC
 
         private void OnEnable()
         {
-            OnPoseWorldLandmarks += OnPoseWorldLandmarksUpdate;
+            OnPoseLandmarks += OnPoseLandmarksUpdate;
+            OnFaceLandmarks += OnFaceLandmarksUpdate;
             OnLeftHandLandmarks += OnLeftHandLandmarksUpdate;
+            OnRightHandLandmarks += OnRightHandLandmarksUpdate;
+            OnPoseWorldLandmarks += OnPoseWorldLandmarksUpdate;
         }
 
         private IEnumerator Start()
@@ -94,11 +97,10 @@ namespace PMC
                 _poseWorldLandmarkListAnnotationController2.VisualizeZ = true;
             }
 
-            if (_handLandmarkListAnnotationController != null)
+            if (_holisticLandmarkListAnnotationController != null)
             {
-                _handLandmarkListAnnotationController.rotationAngle = RotationAngle.Rotation180;
-                _handLandmarkListAnnotationController.isMirrored = true;
-                _handLandmarkListAnnotationController.VisualizeZ = true;
+                _holisticLandmarkListAnnotationController.rotationAngle = RotationAngle.Rotation180;
+                _holisticLandmarkListAnnotationController.isMirrored = true;
             }
 
             _stopwatch.Start();
@@ -267,8 +269,11 @@ namespace PMC
 
         private void OnDisable()
         {
-            OnPoseWorldLandmarks -= OnPoseWorldLandmarksUpdate;
+            OnPoseLandmarks -= OnPoseLandmarksUpdate;
+            OnFaceLandmarks -= OnFaceLandmarksUpdate;
             OnLeftHandLandmarks -= OnLeftHandLandmarksUpdate;
+            OnRightHandLandmarks -= OnRightHandLandmarksUpdate;
+            OnPoseWorldLandmarks -= OnPoseWorldLandmarksUpdate;
         }
 
         private void OnDestroy()
@@ -322,9 +327,15 @@ namespace PMC
         private void OnPoseRoiOutput(object _, OutputStream<NormalizedRect>.OutputEventArgs eventArgs) => OnPoseRoi?.Invoke(eventArgs.Get());
 
 
-        private void OnPoseWorldLandmarksUpdate(LandmarkList landmarkList) => _poseWorldLandmarkListAnnotationController2?.DrawLater(landmarkList);
+        private void OnPoseLandmarksUpdate(NormalizedLandmarkList landmarkList) => _holisticLandmarkListAnnotationController.DrawPoseLandmarkListLater(landmarkList);
 
-        private void OnLeftHandLandmarksUpdate(NormalizedLandmarkList landmarkList) => _handLandmarkListAnnotationController?.DrawLater(landmarkList);
+        private void OnFaceLandmarksUpdate(NormalizedLandmarkList landmarkList) => _holisticLandmarkListAnnotationController.DrawFaceLandmarkListLater(landmarkList);
+
+        private void OnLeftHandLandmarksUpdate(NormalizedLandmarkList landmarkList) => _holisticLandmarkListAnnotationController.DrawLeftHandLandmarkListLater(landmarkList);
+
+        private void OnRightHandLandmarksUpdate(NormalizedLandmarkList landmarkList) => _holisticLandmarkListAnnotationController.DrawRightHandLandmarkListLater(landmarkList);
+
+        private void OnPoseWorldLandmarksUpdate(LandmarkList landmarkList) => _poseWorldLandmarkListAnnotationController2.DrawLater(landmarkList);
     }
 
     public enum InferenceMode
