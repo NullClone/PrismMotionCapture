@@ -47,6 +47,8 @@ namespace PMC.Editor
 
         public override void OnInspectorGUI()
         {
+            serializedObject.Update();
+
             using (new EditorGUI.DisabledScope(true))
             {
                 EditorGUILayout.PropertyField(m_Script, true);
@@ -95,10 +97,12 @@ namespace PMC.Editor
 
             EditorGUILayout.EndFadeGroup();
 
-            UI.DrawSplitter();
+            //UI.DrawSplitter();
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField($"{AssetInfo.AssetName} (v{AssetInfo.AssetVersion})", EditorStyles.centeredGreyMiniLabel);
+
+            serializedObject.ApplyModifiedProperties();
         }
     }
 }
