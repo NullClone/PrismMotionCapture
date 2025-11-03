@@ -64,16 +64,23 @@ namespace PMC
 
         private float _sittingHeight;
         private bool _activePoseLandmark;
+        private bool _activeFaceLandmark;
         private bool _activeLeftHandLandmark;
         private bool _activeRightHandLandmark;
+        private bool _activePoseWorldLandmark;
 
-        private readonly Landmark[] _poseLandmarks = new Landmark[(int)PoseLandmark.Count];
-        private readonly Landmark[] _poseWorldLandmarks = new Landmark[(int)PoseLandmark.Count];
-        private readonly Landmark[] _leftHandLandmarks = new Landmark[(int)HandLandmark.Count];
-        private readonly Landmark[] _rightHandLandmarks = new Landmark[(int)HandLandmark.Count];
+        private readonly Landmark[] _poseLandmarks = new Landmark[PoseLandmarkCount];
+        private readonly Landmark[] _faceLandmarks = new Landmark[FaceLandmarkCount];
+        private readonly Landmark[] _leftHandLandmarks = new Landmark[HandLandmarkCount];
+        private readonly Landmark[] _rightHandLandmarks = new Landmark[HandLandmarkCount];
+        private readonly Landmark[] _poseWorldLandmarks = new Landmark[PoseLandmarkCount];
 
         private readonly Dictionary<HumanBodyBones, Quaternion> _initialLocalRotations = new();
         private readonly Dictionary<HumanBodyBones, Vector3> _initialBoneDirections = new();
+
+        public const int PoseLandmarkCount = 33;
+        public const int HandLandmarkCount = 21;
+        public const int FaceLandmarkCount = 478;
 
 
         // Methods
@@ -137,18 +144,18 @@ namespace PMC
                 }
             }
 
-            for (int i = 0; i < _poseWorldLandmarks.Length; i++)
+            for (int i = 0; i < _faceLandmarks.Length; i++)
             {
-                if (_poseWorldLandmarks[i] == null)
+                if (_faceLandmarks[i] == null)
                 {
-                    _poseWorldLandmarks[i] = new Landmark();
+                    _faceLandmarks[i] = new Landmark();
                 }
 
                 if (_enableKalmanFilter)
                 {
-                    _poseWorldLandmarks[i].KalmanFilter = new KalmanFilter();
-                    _poseWorldLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
-                    _poseWorldLandmarks[i].KalmanFilter.Predict();
+                    _faceLandmarks[i].KalmanFilter = new KalmanFilter();
+                    _faceLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
+                    _faceLandmarks[i].KalmanFilter.Predict();
                 }
             }
 
@@ -181,47 +188,71 @@ namespace PMC
                     _rightHandLandmarks[i].KalmanFilter.Predict();
                 }
             }
+
+            for (int i = 0; i < _poseWorldLandmarks.Length; i++)
+            {
+                if (_poseWorldLandmarks[i] == null)
+                {
+                    _poseWorldLandmarks[i] = new Landmark();
+                }
+
+                if (_enableKalmanFilter)
+                {
+                    _poseWorldLandmarks[i].KalmanFilter = new KalmanFilter();
+                    _poseWorldLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
+                    _poseWorldLandmarks[i].KalmanFilter.Predict();
+                }
+            }
+        }
+
+        private void OnEnable()
+        {
+            if (_tracker != null)
+            {
+                _tracker.OnPoseLandmarks += OnPoseLandmarks;
+                _tracker.OnFaceLandmarks += OnFaceLandmarks;
+                _tracker.OnLeftHandLandmarks += OnLeftHandLandmarks;
+                _tracker.OnRightHandLandmarks += OnRightHandLandmarks;
+                _tracker.OnPoseWorldLandmarks += OnPoseWorldLandmarks;
+            }
+
+            if (_IKType == IKType.VRIK)
+            {
+                _VRIK.solver.OnPreUpdate += OnPreVRIK;
+            }
+
+            if (_IKType == IKType.FBBIK)
+            {
+                _FBBIK.solver.OnPreUpdate += OnPreFBBIK;
+            }
         }
 
         private void Start()
         {
-            if (_animator == null) return;
-
-            if (_tracker != null)
-            {
-                _tracker.OnPoseLandmarks += OnPoseLandmarks;
-                _tracker.OnPoseWorldLandmarks += OnPoseWorldLandmarks;
-                _tracker.OnLeftHandLandmarks += OnLeftHandLandmarks;
-                _tracker.OnRightHandLandmarks += OnRightHandLandmarks;
-            }
-
             CreateTarget();
 
             InitializeFinger();
 
             if (_IKType == IKType.VRIK)
             {
-                _VRIK.solver.OnPreUpdate += OnPreVRIK;
-
                 InitializeVRIK();
             }
 
             if (_IKType == IKType.FBBIK)
             {
-                _FBBIK.solver.OnPreUpdate += OnPreFBBIK;
-
                 InitializeFBBIK();
             }
         }
 
-        private void OnDestroy()
+        private void OnDisable()
         {
             if (_tracker != null)
             {
                 _tracker.OnPoseLandmarks -= OnPoseLandmarks;
-                _tracker.OnPoseWorldLandmarks -= OnPoseWorldLandmarks;
+                _tracker.OnFaceLandmarks -= OnFaceLandmarks;
                 _tracker.OnLeftHandLandmarks -= OnLeftHandLandmarks;
                 _tracker.OnRightHandLandmarks -= OnRightHandLandmarks;
+                _tracker.OnPoseWorldLandmarks -= OnPoseWorldLandmarks;
             }
 
             if (_IKType == IKType.VRIK)
@@ -951,8 +982,10 @@ namespace PMC
             }
         }
 
-        private void OnPoseWorldLandmarks(LandmarkList landmarkList)
+        private void OnFaceLandmarks(NormalizedLandmarkList landmarkList)
         {
+            _activeFaceLandmark = landmarkList != null;
+
             if (landmarkList == null) return;
 
             var landmark = landmarkList.Landmark;
@@ -961,13 +994,13 @@ namespace PMC
 
             for (int i = 0; i < landmark.Count; i++)
             {
-                _poseWorldLandmarks[i].Set(landmark[i]);
+                _faceLandmarks[i].Set(landmark[i]);
 
-                _poseWorldLandmarks[i].Position = Vector3.Scale(_poseWorldLandmarks[i].Position, _landmarkScale);
+                _faceLandmarks[i].Position = Vector3.Scale(_faceLandmarks[i].Position, _landmarkScale);
 
                 if (_enableKalmanFilter)
                 {
-                    _poseWorldLandmarks[i].Position = _poseWorldLandmarks[i].KalmanFilter.Update(_poseWorldLandmarks[i].Position);
+                    _faceLandmarks[i].Position = _faceLandmarks[i].KalmanFilter.Update(_faceLandmarks[i].Position);
                 }
             }
         }
@@ -1018,6 +1051,29 @@ namespace PMC
             }
         }
 
+        private void OnPoseWorldLandmarks(LandmarkList landmarkList)
+        {
+            _activePoseWorldLandmark = landmarkList != null;
+
+            if (landmarkList == null) return;
+
+            var landmark = landmarkList.Landmark;
+
+            if (landmark == null) return;
+
+            for (int i = 0; i < landmark.Count; i++)
+            {
+                _poseWorldLandmarks[i].Set(landmark[i]);
+
+                _poseWorldLandmarks[i].Position = Vector3.Scale(_poseWorldLandmarks[i].Position, _landmarkScale);
+
+                if (_enableKalmanFilter)
+                {
+                    _poseWorldLandmarks[i].Position = _poseWorldLandmarks[i].KalmanFilter.Update(_poseWorldLandmarks[i].Position);
+                }
+            }
+        }
+
 
         private static Quaternion LookRotation(Vector3 forward, Vector3 upwards)
         {
@@ -1041,7 +1097,6 @@ namespace PMC
 
     public enum IKType
     {
-        None,
         VRIK,
         FBBIK,
     }

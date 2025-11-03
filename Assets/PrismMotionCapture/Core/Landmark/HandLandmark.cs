@@ -23,6 +23,5 @@ namespace PMC
         PinkyPip = 18,
         PinkyDip = 19,
         PinkyTip = 20,
-        Count,
     }
 }

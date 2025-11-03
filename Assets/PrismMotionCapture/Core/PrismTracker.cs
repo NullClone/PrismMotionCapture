@@ -41,7 +41,6 @@ namespace PMC
 
         private CalculatorGraph _calculatorGraph;
         private TextureFramePool _textureFramePool;
-        private Stopwatch _stopwatch = new();
 
         private OutputStream<Detection> _poseDetectionStream;
         private OutputStream<NormalizedLandmarkList> _poseLandmarksStream;
@@ -61,6 +60,8 @@ namespace PMC
         public event Action<ImageFrame> OnSegmentationMask;
         public event Action<NormalizedRect> OnPoseRoi;
 
+        private readonly Stopwatch _stopwatch = new();
+
         private const string PoseDetectionStream = "pose_detection";
         private const string PoseLandmarksStream = "pose_landmarks";
         private const string FaceLandmarksStream = "face_landmarks";
@@ -78,7 +79,13 @@ namespace PMC
 
         // Methods
 
-        private void Awake()
+        private void OnEnable()
+        {
+            OnPoseWorldLandmarks += OnPoseWorldLandmarksUpdate;
+            OnLeftHandLandmarks += OnLeftHandLandmarksUpdate;
+        }
+
+        private IEnumerator Start()
         {
             if (_poseWorldLandmarkListAnnotationController2 != null)
             {
@@ -93,16 +100,7 @@ namespace PMC
                 _handLandmarkListAnnotationController.isMirrored = true;
                 _handLandmarkListAnnotationController.VisualizeZ = true;
             }
-        }
 
-        private void OnEnable()
-        {
-            OnPoseWorldLandmarks += OnPoseWorldLandmarksUpdate;
-            OnLeftHandLandmarks += OnLeftHandLandmarksUpdate;
-        }
-
-        private IEnumerator Start()
-        {
             _stopwatch.Start();
 
             if (_inferenceMode == InferenceMode.GPU)

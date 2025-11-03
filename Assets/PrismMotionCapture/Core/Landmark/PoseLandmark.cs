@@ -35,6 +35,5 @@ namespace PMC
         RightHeel = 30,
         LeftFootIndex = 31,
         RightFootIndex = 32,
-        Count,
     }
 }
