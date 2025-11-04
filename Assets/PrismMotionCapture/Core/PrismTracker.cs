@@ -18,7 +18,8 @@ namespace PMC
         // Fields
 
         [SerializeField] private ImageSource _imageSource;
-        [SerializeField] private ImageReadMode _imageReadMode = ImageReadMode.CPU;
+        [SerializeField] private ImageReadMode _imageReadMode = ImageReadMode.CPUAsync;
+        [SerializeField] private AssetLoaderType _assetLoaderType = AssetLoaderType.Local;
 
         [SerializeField, HideInInspector]
         private BaseOptions.Delegate _delegate =
@@ -45,7 +46,13 @@ namespace PMC
         {
             if (_imageSource == null) yield break;
 
-            IResourceManager manager = new LocalResourceManager();
+            IResourceManager manager = _assetLoaderType switch
+            {
+                AssetLoaderType.StreamingAssets => new StreamingAssetsResourceManager(),
+                AssetLoaderType.AssetBundle => new AssetBundleResourceManager(""),
+                AssetLoaderType.Local => new LocalResourceManager(),
+                _ => throw new ArgumentOutOfRangeException(),
+            };
 
             var modelAssetPath = "holistic_landmarker.bytes";
 
@@ -206,5 +213,12 @@ namespace PMC
         CPU,
         CPUAsync,
         GPU,
+    }
+
+    public enum AssetLoaderType
+    {
+        StreamingAssets,
+        AssetBundle,
+        Local,
     }
 }
