@@ -22,6 +22,7 @@ namespace PMC
         [SerializeField] private BaseOptions.Delegate _delegate = BaseOptions.Delegate.CPU;
         [SerializeField] private RunningMode _runningMode = RunningMode.LIVE_STREAM;
         [SerializeField] private AssetLoaderType _assetLoaderType = AssetLoaderType.Local;
+        [SerializeField] private string _modelAssetPath = "holistic_landmarker.bytes";
         [SerializeField] private ImageReadMode _imageReadMode = ImageReadMode.CPUAsync;
         [Space]
         [SerializeField, Range(0f, 1f)] private float _minFaceDetectionConfidence = 0.5f;
@@ -56,18 +57,18 @@ namespace PMC
                 _ => throw new ArgumentOutOfRangeException(),
             };
 
-            var modelAssetPath = "holistic_landmarker.bytes";
+            yield return manager.PrepareAssetAsync(_modelAssetPath);
 
-            yield return manager.PrepareAssetAsync(modelAssetPath);
-
+            if (_delegate != BaseOptions.Delegate.CPU)
+            {
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+                Debug.LogWarning("GPU delegate selected on PC platform. Forcing fallback to CPU.");
 
-            _delegate = BaseOptions.Delegate.CPU;
-#else
-            _delegate = BaseOptions.Delegate.GPU;
+                _delegate = BaseOptions.Delegate.CPU;
 #endif
+            }
 
-            var baseOptions = new BaseOptions(_delegate, modelAssetPath);
+            var baseOptions = new BaseOptions(_delegate, _modelAssetPath);
 
             var options = new HolisticLandmarkerOptions(
                 baseOptions,
@@ -191,6 +192,13 @@ namespace PMC
 
                                 break;
                             }
+                    }
+
+                    image.Dispose();
+
+                    if (_imageReadMode == ImageReadMode.GPU)
+                    {
+                        textureFrame.Release();
                     }
                 }
                 else
