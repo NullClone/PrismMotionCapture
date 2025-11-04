@@ -18,19 +18,21 @@ namespace PMC
         // Fields
 
         [SerializeField] private ImageSource _imageSource;
-        [SerializeField] private ImageReadMode _imageReadMode = ImageReadMode.CPUAsync;
+        [Space]
+        [SerializeField] private BaseOptions.Delegate _delegate = BaseOptions.Delegate.CPU;
+        [SerializeField] private RunningMode _runningMode = RunningMode.LIVE_STREAM;
         [SerializeField] private AssetLoaderType _assetLoaderType = AssetLoaderType.Local;
-
-        [SerializeField, HideInInspector]
-        private BaseOptions.Delegate _delegate =
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
-        BaseOptions.Delegate.CPU;
-#else
-        BaseOptions.Delegate.GPU;
-#endif
-
-        [SerializeField, HideInInspector]
-        private RunningMode _runningMode = RunningMode.LIVE_STREAM;
+        [SerializeField] private ImageReadMode _imageReadMode = ImageReadMode.CPUAsync;
+        [Space]
+        [SerializeField, Range(0f, 1f)] private float _minFaceDetectionConfidence = 0.5f;
+        [SerializeField, Range(0f, 1f)] private float _minFaceSuppressionThreshold = 0.5f;
+        [SerializeField, Range(0f, 1f)] private float _minFaceLandmarksConfidence = 0.5f;
+        [SerializeField, Range(0f, 1f)] private float _minPoseDetectionConfidence = 0.5f;
+        [SerializeField, Range(0f, 1f)] private float _minPoseSuppressionThreshold = 0.5f;
+        [SerializeField, Range(0f, 1f)] private float _minPoseLandmarksConfidence = 0.5f;
+        [SerializeField, Range(0f, 1f)] private float _minHandLandmarksConfidence = 0.5f;
+        [SerializeField] private bool _outputFaceBlendshapes = false;
+        [SerializeField] private bool _outputSegmentationMask = false;
 
         private HolisticLandmarker _holisticLandmarker;
         private TextureFramePool _textureFramePool;
@@ -58,20 +60,27 @@ namespace PMC
 
             yield return manager.PrepareAssetAsync(modelAssetPath);
 
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+
+            _delegate = BaseOptions.Delegate.CPU;
+#else
+            _delegate = BaseOptions.Delegate.GPU;
+#endif
+
             var baseOptions = new BaseOptions(_delegate, modelAssetPath);
 
             var options = new HolisticLandmarkerOptions(
-                baseOptions: baseOptions,
-                runningMode: _runningMode,
-                minFaceDetectionConfidence: 0.5f,
-                minFaceSuppressionThreshold: 0.5f,
-                minFaceLandmarksConfidence: 0.5f,
-                minPoseDetectionConfidence: 0.5f,
-                minPoseSuppressionThreshold: 0.5f,
-                minPoseLandmarksConfidence: 0.5f,
-                minHandLandmarksConfidence: 0.5f,
-                outputFaceBlendshapes: false,
-                outputSegmentationMask: false,
+                baseOptions,
+                _runningMode,
+                _minFaceDetectionConfidence,
+                _minFaceSuppressionThreshold,
+                _minFaceLandmarksConfidence,
+                _minPoseDetectionConfidence,
+                _minPoseSuppressionThreshold,
+                _minPoseLandmarksConfidence,
+                _minHandLandmarksConfidence,
+                _outputFaceBlendshapes,
+                _outputSegmentationMask,
                 resultCallback: (_runningMode == RunningMode.LIVE_STREAM) ? ResultCallback : null);
 
             _holisticLandmarker = HolisticLandmarker.CreateFromOptions(options, GpuManager.GpuResources);
