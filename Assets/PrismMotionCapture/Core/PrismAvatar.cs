@@ -1,4 +1,4 @@
-using Mediapipe;
+using Mediapipe.Tasks.Vision.HolisticLandmarker;
 using RootMotion;
 using RootMotion.FinalIK;
 using System.Collections.Generic;
@@ -203,11 +203,7 @@ namespace PMC
         {
             if (_tracker != null)
             {
-                _tracker.OnPoseLandmarks += OnPoseLandmarks;
-                _tracker.OnFaceLandmarks += OnFaceLandmarks;
-                _tracker.OnLeftHandLandmarks += OnLeftHandLandmarks;
-                _tracker.OnRightHandLandmarks += OnRightHandLandmarks;
-                _tracker.OnPoseWorldLandmarks += OnPoseWorldLandmarks;
+                _tracker.OnCallback += OnCallback;
             }
 
             if (_IKType == IKType.VRIK)
@@ -242,11 +238,7 @@ namespace PMC
         {
             if (_tracker != null)
             {
-                _tracker.OnPoseLandmarks -= OnPoseLandmarks;
-                _tracker.OnFaceLandmarks -= OnFaceLandmarks;
-                _tracker.OnLeftHandLandmarks -= OnLeftHandLandmarks;
-                _tracker.OnRightHandLandmarks -= OnRightHandLandmarks;
-                _tracker.OnPoseWorldLandmarks -= OnPoseWorldLandmarks;
+                _tracker.OnCallback -= OnCallback;
             }
 
             if (_IKType == IKType.VRIK)
@@ -451,8 +443,8 @@ namespace PMC
             _FBBIK.solver.rightThighEffector.positionWeight = 1f;
             _FBBIK.solver.rightThighEffector.rotationWeight = 1f;
 
-            _FBBIK.solver.leftArmChain.bendConstraint.weight = 0.7f;
-            _FBBIK.solver.rightArmChain.bendConstraint.weight = 0.7f;
+            _FBBIK.solver.leftArmChain.bendConstraint.weight = 1f;
+            _FBBIK.solver.rightArmChain.bendConstraint.weight = 1f;
 
             _FBBIK.solver.headMapping.maintainRotationWeight = 1f;
             _FBBIK.solver.leftArmMapping.maintainRotationWeight = 1f;
@@ -464,7 +456,7 @@ namespace PMC
 
             _headEffector = _headTarget.gameObject.AddComponent<FBBIKHeadEffector>();
             _headEffector.ik = _FBBIK;
-            _headEffector.positionWeight = 1f;
+            _headEffector.positionWeight = 0f;
             _headEffector.rotationWeight = 1f;
             _headEffector.bodyClampWeight = 0f;
             _headEffector.headClampWeight = 0f;
@@ -545,7 +537,7 @@ namespace PMC
                         }
                         else
                         {
-                            _initialBoneDirections.Add(bone, Vector3.up);
+                            Debug.LogWarning($"Cannot determine initial bone direction for {bone}.");
                         }
                     }
                 }
@@ -774,12 +766,12 @@ namespace PMC
         {
             if (_autoWeight)
             {
-                _VRIK.solver.leftLeg.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility;
-                _VRIK.solver.leftLeg.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility;
-                _VRIK.solver.leftLeg.bendGoalWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftKnee].Visibility;
-                _VRIK.solver.rightLeg.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility;
-                _VRIK.solver.rightLeg.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility;
-                _VRIK.solver.rightLeg.bendGoalWeight = _poseWorldLandmarks[(int)PoseLandmark.RightKnee].Visibility;
+                _VRIK.solver.leftLeg.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility ?? 0f;
+                _VRIK.solver.leftLeg.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility ?? 0f;
+                _VRIK.solver.leftLeg.bendGoalWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftKnee].Visibility ?? 0f;
+                _VRIK.solver.rightLeg.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility ?? 0f;
+                _VRIK.solver.rightLeg.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility ?? 0f;
+                _VRIK.solver.rightLeg.bendGoalWeight = _poseWorldLandmarks[(int)PoseLandmark.RightKnee].Visibility ?? 0f;
             }
             else
             {
@@ -839,16 +831,16 @@ namespace PMC
         {
             if (_autoWeight)
             {
-                _FBBIK.solver.leftFootEffector.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility;
-                _FBBIK.solver.leftFootEffector.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility;
-                _FBBIK.solver.rightFootEffector.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility;
-                _FBBIK.solver.rightFootEffector.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility;
-                _FBBIK.solver.leftLegChain.bendConstraint.weight = _poseWorldLandmarks[(int)PoseLandmark.LeftKnee].Visibility;
-                _FBBIK.solver.rightLegChain.bendConstraint.weight = _poseWorldLandmarks[(int)PoseLandmark.RightKnee].Visibility;
-                _FBBIK.solver.leftThighEffector.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHip].Visibility;
-                _FBBIK.solver.leftThighEffector.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHip].Visibility;
-                _FBBIK.solver.rightThighEffector.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHip].Visibility;
-                _FBBIK.solver.rightThighEffector.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHip].Visibility;
+                _FBBIK.solver.leftFootEffector.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility ?? 0f;
+                _FBBIK.solver.leftFootEffector.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility ?? 0f;
+                _FBBIK.solver.rightFootEffector.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility ?? 0f;
+                _FBBIK.solver.rightFootEffector.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility ?? 0f;
+                _FBBIK.solver.leftLegChain.bendConstraint.weight = _poseWorldLandmarks[(int)PoseLandmark.LeftKnee].Visibility ?? 0f;
+                _FBBIK.solver.rightLegChain.bendConstraint.weight = _poseWorldLandmarks[(int)PoseLandmark.RightKnee].Visibility ?? 0f;
+                _FBBIK.solver.leftThighEffector.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHip].Visibility ?? 0f;
+                _FBBIK.solver.leftThighEffector.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHip].Visibility ?? 0f;
+                _FBBIK.solver.rightThighEffector.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHip].Visibility ?? 0f;
+                _FBBIK.solver.rightThighEffector.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHip].Visibility ?? 0f;
             }
             else
             {
@@ -916,6 +908,53 @@ namespace PMC
             }
         }
 
+        private void OnCallback(HolisticLandmarkerResult result)
+        {
+            _activeFaceLandmark = Set(_faceLandmarks, result.faceLandmarks.landmarks);
+            _activePoseLandmark = Set(_poseLandmarks, result.poseLandmarks.landmarks);
+            _activePoseWorldLandmark = Set(_poseWorldLandmarks, result.poseWorldLandmarks.landmarks);
+            _activeLeftHandLandmark = Set(_leftHandLandmarks, result.leftHandWorldLandmarks.landmarks);
+            _activeRightHandLandmark = Set(_rightHandLandmarks, result.rightHandLandmarks.landmarks);
+        }
+
+        private bool Set(Landmark[] landmarks, List<Mediapipe.Tasks.Components.Containers.NormalizedLandmark> normalizedLandmarks)
+        {
+            if (normalizedLandmarks == null) return false;
+
+            for (int i = 0; i < normalizedLandmarks.Count; i++)
+            {
+                landmarks[i].Set(normalizedLandmarks[i]);
+
+                landmarks[i].Position = Vector3.Scale(landmarks[i].Position, _landmarkScale);
+
+                if (_enableKalmanFilter)
+                {
+                    landmarks[i].Position = landmarks[i].KalmanFilter.Update(landmarks[i].Position);
+                }
+            }
+
+            return true;
+        }
+
+        private bool Set(Landmark[] landmarks, List<Mediapipe.Tasks.Components.Containers.Landmark> normalizedLandmarks)
+        {
+            if (normalizedLandmarks == null) return false;
+
+            for (int i = 0; i < normalizedLandmarks.Count; i++)
+            {
+                landmarks[i].Set(normalizedLandmarks[i]);
+
+                landmarks[i].Position = Vector3.Scale(landmarks[i].Position, _landmarkScale);
+
+                if (_enableKalmanFilter)
+                {
+                    landmarks[i].Position = landmarks[i].KalmanFilter.Update(landmarks[i].Position);
+                }
+            }
+
+            return true;
+        }
+
         private void ComputeFingerRotation(HumanBodyBones proximalBone, HandLandmark firstLandmark, Quaternion handWorldRotation)
         {
             for (int i = 0; i < 3; i++)
@@ -941,121 +980,6 @@ namespace PMC
                     transform.localRotation = Quaternion.FromToRotation(_initialBoneDirections[bone], initialBoneLocalTargetDirection) * initialLocalRotation;
 
                     handWorldRotation = Quaternion.Inverse(transform.localRotation) * handWorldRotation;
-                }
-            }
-        }
-
-        private void OnPoseLandmarks(NormalizedLandmarkList landmarkList)
-        {
-            _activePoseLandmark = landmarkList != null;
-
-            if (landmarkList == null) return;
-
-            var landmark = landmarkList.Landmark;
-
-            if (landmark == null) return;
-
-            for (int i = 0; i < landmark.Count; i++)
-            {
-                _poseLandmarks[i].Set(landmark[i]);
-
-                _poseLandmarks[i].Position = Vector3.Scale(_poseLandmarks[i].Position, _landmarkScale);
-
-                if (_enableKalmanFilter)
-                {
-                    _poseLandmarks[i].Position = _poseLandmarks[i].KalmanFilter.Update(_poseLandmarks[i].Position);
-                }
-            }
-        }
-
-        private void OnFaceLandmarks(NormalizedLandmarkList landmarkList)
-        {
-            _activeFaceLandmark = landmarkList != null;
-
-            if (landmarkList == null) return;
-
-            var landmark = landmarkList.Landmark;
-
-            if (landmark == null) return;
-
-            for (int i = 0; i < landmark.Count; i++)
-            {
-                _faceLandmarks[i].Set(landmark[i]);
-
-                _faceLandmarks[i].Position = Vector3.Scale(_faceLandmarks[i].Position, _landmarkScale);
-
-                if (_enableKalmanFilter)
-                {
-                    _faceLandmarks[i].Position = _faceLandmarks[i].KalmanFilter.Update(_faceLandmarks[i].Position);
-                }
-            }
-        }
-
-        private void OnLeftHandLandmarks(NormalizedLandmarkList landmarkList)
-        {
-            _activeLeftHandLandmark = landmarkList != null;
-
-            if (landmarkList == null) return;
-
-            var landmark = landmarkList.Landmark;
-
-            if (landmark == null) return;
-
-            for (int i = 0; i < landmark.Count; i++)
-            {
-                _leftHandLandmarks[i].Set(landmark[i]);
-
-                _leftHandLandmarks[i].Position = Vector3.Scale(_leftHandLandmarks[i].Position, _landmarkScale);
-
-                if (_enableKalmanFilter)
-                {
-                    _leftHandLandmarks[i].Position = _leftHandLandmarks[i].KalmanFilter.Update(_leftHandLandmarks[i].Position);
-                }
-            }
-        }
-
-        private void OnRightHandLandmarks(NormalizedLandmarkList landmarkList)
-        {
-            _activeRightHandLandmark = landmarkList != null;
-
-            if (landmarkList == null) return;
-
-            var landmark = landmarkList.Landmark;
-
-            if (landmark == null) return;
-
-            for (int i = 0; i < landmark.Count; i++)
-            {
-                _rightHandLandmarks[i].Set(landmark[i]);
-
-                _rightHandLandmarks[i].Position = Vector3.Scale(_rightHandLandmarks[i].Position, _landmarkScale);
-
-                if (_enableKalmanFilter)
-                {
-                    _rightHandLandmarks[i].Position = _rightHandLandmarks[i].KalmanFilter.Update(_rightHandLandmarks[i].Position);
-                }
-            }
-        }
-
-        private void OnPoseWorldLandmarks(LandmarkList landmarkList)
-        {
-            _activePoseWorldLandmark = landmarkList != null;
-
-            if (landmarkList == null) return;
-
-            var landmark = landmarkList.Landmark;
-
-            if (landmark == null) return;
-
-            for (int i = 0; i < landmark.Count; i++)
-            {
-                _poseWorldLandmarks[i].Set(landmark[i]);
-
-                _poseWorldLandmarks[i].Position = Vector3.Scale(_poseWorldLandmarks[i].Position, _landmarkScale);
-
-                if (_enableKalmanFilter)
-                {
-                    _poseWorldLandmarks[i].Position = _poseWorldLandmarks[i].KalmanFilter.Update(_poseWorldLandmarks[i].Position);
                 }
             }
         }
