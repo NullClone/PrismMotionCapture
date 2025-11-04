@@ -386,7 +386,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 85e41428a85668448a40736e9d44f2a6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _tracker: {fileID: 570078764}
+  _tracker: {fileID: 570078765}
   _IKType: 1
   _enableTwistRelaxer: 1
   _enableMovement: 0
@@ -394,7 +394,7 @@ MonoBehaviour:
   _landmarkScale: {x: 1, y: 1, z: -1}
   _handRotationOffset: {x: 0, y: 90, z: 0}
   _enableKalmanFilter: 1
-  _timeInterval: 0.3
+  _timeInterval: 0.2
   _noise: 0.4
 --- !u!1001 &318079323
 PrefabInstance:
@@ -908,7 +908,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 570078763}
-  - component: {fileID: 570078764}
+  - component: {fileID: 570078765}
   m_Layer: 0
   m_Name: Tracker
   m_TagString: Untagged
@@ -931,7 +931,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &570078764
+--- !u!114 &570078765
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -940,23 +940,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 570078761}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 060788c1a1b38444d8447ea6edb6ea58, type: 3}
+  m_Script: {fileID: 11500000, guid: d898f8546afc74d4c978a86c32ff521c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _imageSource: {fileID: 126484967}
-  _inferenceMode: 1
-  modelComplexity: 1
-  _detectionConfidence: 0.5
-  _trackingConfidence: 0.5
-  _refineFaceLandmarks: 1
-  _smoothLandmarks: 1
-  _enableSegmentation: 0
-  _smoothSegmentation: 0
-  _poseWorldLandmarkListAnnotationController2: {fileID: 1644901800}
-  _holisticLandmarkListAnnotationController: {fileID: 884725904}
-  _CPUConfig: {fileID: 4900000, guid: a901443779a96c97890cab1b274b506f, type: 3}
-  _GPUConfig: {fileID: 4900000, guid: 8eaa695afee89c8eea9241f8a5ab9645, type: 3}
-  _OpenGLESConfig: {fileID: 4900000, guid: 5db98b44b5bd2a0e8b5c7dec21d0577d, type: 3}
+  _imageReadMode: 1
+  _delegate: 0
+  _runningMode: 2
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -1351,6 +1341,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: Vita
+      objectReference: {fileID: 0}
+    - target: {fileID: -1728013695380148634, guid: 5acb1dbfa944c3b4aa1a48683b6756ba,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4870552773557632513, guid: 5acb1dbfa944c3b4aa1a48683b6756ba,
         type: 3}
