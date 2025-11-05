@@ -1197,7 +1197,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1644901799
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1227,13 +1227,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 1644901797}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d3abeb987dc4e5649bb3f44539eeaa5a, type: 3}
+  m_Script: {fileID: 11500000, guid: f152430ce9da8f9f2ae5cfd135b4d061, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   annotation: {fileID: 536442771}
-  HipHeightMeter: 1
-  Scale: {x: 1, y: 1, z: 1}
-  VisualizeZ: 1
+  _hipHeightMeter: 1
+  _scale: {x: 1, y: 1, z: 1}
+  _visualizeZ: 1
 --- !u!1 &1866232244
 GameObject:
   m_ObjectHideFlags: 0
