@@ -57,17 +57,22 @@ namespace PMC
         private Quaternion _inverseRightHandRotation;
 
         private float _sittingHeight;
-        private bool _activePoseLandmark;
         private bool _activeFaceLandmark;
-        private bool _activeLeftHandLandmark;
-        private bool _activeRightHandLandmark;
+        private bool _activePoseLandmark;
         private bool _activePoseWorldLandmark;
+        private bool _activeLeftHandLandmark;
+        private bool _activeleftHandWorldLandmark;
+        private bool _activeRightHandLandmark;
+        private bool _activerightHandWorldLandmark;
 
-        private readonly Landmark[] _poseLandmarks = new Landmark[PoseLandmarkCount];
         private readonly Landmark[] _faceLandmarks = new Landmark[FaceLandmarkCount];
-        private readonly Landmark[] _leftHandLandmarks = new Landmark[HandLandmarkCount];
-        private readonly Landmark[] _rightHandLandmarks = new Landmark[HandLandmarkCount];
+        private readonly Landmark[] _poseLandmarks = new Landmark[PoseLandmarkCount];
         private readonly Landmark[] _poseWorldLandmarks = new Landmark[PoseLandmarkCount];
+        private readonly Landmark[] _leftHandLandmarks = new Landmark[HandLandmarkCount];
+        private readonly Landmark[] _leftHandWorldLandmarks = new Landmark[HandLandmarkCount];
+        private readonly Landmark[] _rightHandLandmarks = new Landmark[HandLandmarkCount];
+        private readonly Landmark[] _rightHandWorldLandmarks = new Landmark[HandLandmarkCount];
+
 
         private readonly Dictionary<HumanBodyBones, Quaternion> _initialLocalRotations = new();
         private readonly Dictionary<HumanBodyBones, Vector3> _initialBoneDirections = new();
@@ -123,80 +128,13 @@ namespace PMC
                 }
             }
 
-            for (int i = 0; i < _poseLandmarks.Length; i++)
-            {
-                if (_poseLandmarks[i] == null)
-                {
-                    _poseLandmarks[i] = new Landmark();
-                }
-
-                if (_enableKalmanFilter)
-                {
-                    _poseLandmarks[i].KalmanFilter = new KalmanFilter();
-                    _poseLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
-                    _poseLandmarks[i].KalmanFilter.Predict();
-                }
-            }
-
-            for (int i = 0; i < _faceLandmarks.Length; i++)
-            {
-                if (_faceLandmarks[i] == null)
-                {
-                    _faceLandmarks[i] = new Landmark();
-                }
-
-                if (_enableKalmanFilter)
-                {
-                    _faceLandmarks[i].KalmanFilter = new KalmanFilter();
-                    _faceLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
-                    _faceLandmarks[i].KalmanFilter.Predict();
-                }
-            }
-
-            for (int i = 0; i < _leftHandLandmarks.Length; i++)
-            {
-                if (_leftHandLandmarks[i] == null)
-                {
-                    _leftHandLandmarks[i] = new Landmark();
-                }
-
-                if (_enableKalmanFilter)
-                {
-                    _leftHandLandmarks[i].KalmanFilter = new KalmanFilter();
-                    _leftHandLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
-                    _leftHandLandmarks[i].KalmanFilter.Predict();
-                }
-            }
-
-            for (int i = 0; i < _rightHandLandmarks.Length; i++)
-            {
-                if (_rightHandLandmarks[i] == null)
-                {
-                    _rightHandLandmarks[i] = new Landmark();
-                }
-
-                if (_enableKalmanFilter)
-                {
-                    _rightHandLandmarks[i].KalmanFilter = new KalmanFilter();
-                    _rightHandLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
-                    _rightHandLandmarks[i].KalmanFilter.Predict();
-                }
-            }
-
-            for (int i = 0; i < _poseWorldLandmarks.Length; i++)
-            {
-                if (_poseWorldLandmarks[i] == null)
-                {
-                    _poseWorldLandmarks[i] = new Landmark();
-                }
-
-                if (_enableKalmanFilter)
-                {
-                    _poseWorldLandmarks[i].KalmanFilter = new KalmanFilter();
-                    _poseWorldLandmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
-                    _poseWorldLandmarks[i].KalmanFilter.Predict();
-                }
-            }
+            InitializeLandmark(_faceLandmarks);
+            InitializeLandmark(_poseLandmarks);
+            InitializeLandmark(_poseWorldLandmarks);
+            InitializeLandmark(_leftHandLandmarks);
+            InitializeLandmark(_leftHandWorldLandmarks);
+            InitializeLandmark(_rightHandLandmarks);
+            InitializeLandmark(_rightHandWorldLandmarks);
         }
 
         private void OnEnable()
@@ -249,6 +187,20 @@ namespace PMC
             if (_IKType == IKType.FBBIK)
             {
                 _FBBIK.solver.OnPreUpdate -= OnPreFBBIK;
+            }
+        }
+
+        private void InitializeLandmark(Landmark[] landmarks)
+        {
+            for (int i = 0; i < landmarks.Length; i++)
+            {
+                landmarks[i] = new Landmark();
+
+                if (_enableKalmanFilter)
+                {
+                    landmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
+                    landmarks[i].KalmanFilter.Predict();
+                }
             }
         }
 
@@ -648,8 +600,8 @@ namespace PMC
             }
             else
             {
-                var leftHandWristToMiddle = _leftHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position - _leftHandLandmarks[(int)HandLandmark.Wrist].Position;
-                var leftHandPinkyToIndex = _leftHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position - _leftHandLandmarks[(int)HandLandmark.PinkyMcp].Position;
+                var leftHandWristToMiddle = _leftHandWorldLandmarks[(int)HandLandmark.MiddleFingerMcp].Position - _leftHandWorldLandmarks[(int)HandLandmark.Wrist].Position;
+                var leftHandPinkyToIndex = _leftHandWorldLandmarks[(int)HandLandmark.IndexFingerMcp].Position - _leftHandWorldLandmarks[(int)HandLandmark.PinkyMcp].Position;
                 var leftHandUpVector = Vector3.Cross(leftHandPinkyToIndex, leftHandWristToMiddle).normalized;
                 var leftHandForwardVector = Vector3.Cross(leftHandUpVector, leftHandPinkyToIndex).normalized;
 
@@ -672,8 +624,8 @@ namespace PMC
             }
             else
             {
-                var rightHandWristToMiddle = _rightHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position - _rightHandLandmarks[(int)HandLandmark.Wrist].Position;
-                var rightHandPinkyToIndex = _rightHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position - _rightHandLandmarks[(int)HandLandmark.PinkyMcp].Position;
+                var rightHandWristToMiddle = _rightHandWorldLandmarks[(int)HandLandmark.MiddleFingerMcp].Position - _rightHandWorldLandmarks[(int)HandLandmark.Wrist].Position;
+                var rightHandPinkyToIndex = _rightHandWorldLandmarks[(int)HandLandmark.IndexFingerMcp].Position - _rightHandWorldLandmarks[(int)HandLandmark.PinkyMcp].Position;
                 var rightHandUpVector = Vector3.Cross(rightHandPinkyToIndex, rightHandWristToMiddle).normalized;
                 var rightHandForwardVector = Vector3.Cross(rightHandUpVector, rightHandPinkyToIndex).normalized;
 
@@ -724,10 +676,10 @@ namespace PMC
                 var lHandTransform = _animator.GetBoneTransform(HumanBodyBones.LeftHand);
 
                 var lHandUp = TriangleNormal(
-                                        _leftHandLandmarks[(int)HandLandmark.Wrist].Position,
-                                        _leftHandLandmarks[(int)HandLandmark.PinkyMcp].Position,
-                                        _leftHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position);
-                var lHandForward = (_leftHandLandmarks[(int)HandLandmark.Wrist].Position - _leftHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
+                                        _leftHandWorldLandmarks[(int)HandLandmark.Wrist].Position,
+                                        _leftHandWorldLandmarks[(int)HandLandmark.PinkyMcp].Position,
+                                        _leftHandWorldLandmarks[(int)HandLandmark.IndexFingerMcp].Position);
+                var lHandForward = (_leftHandWorldLandmarks[(int)HandLandmark.Wrist].Position - _leftHandWorldLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
 
                 lHandTransform.rotation = LookRotation(lHandForward, lHandUp) * _inverseLeftHandRotation;
 
@@ -745,10 +697,10 @@ namespace PMC
                 var rHandTransform = _animator.GetBoneTransform(HumanBodyBones.RightHand);
 
                 var rHandUp = TriangleNormal(
-                                        _rightHandLandmarks[(int)HandLandmark.Wrist].Position,
-                                        _rightHandLandmarks[(int)HandLandmark.IndexFingerMcp].Position,
-                                        _rightHandLandmarks[(int)HandLandmark.PinkyMcp].Position);
-                var rHandForward = (_rightHandLandmarks[(int)HandLandmark.Wrist].Position - _rightHandLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
+                                        _rightHandWorldLandmarks[(int)HandLandmark.Wrist].Position,
+                                        _rightHandWorldLandmarks[(int)HandLandmark.IndexFingerMcp].Position,
+                                        _rightHandWorldLandmarks[(int)HandLandmark.PinkyMcp].Position);
+                var rHandForward = (_rightHandWorldLandmarks[(int)HandLandmark.Wrist].Position - _rightHandWorldLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
 
                 rHandTransform.rotation = LookRotation(rHandForward, rHandUp) * _inverseRightHandRotation;
 
@@ -922,7 +874,7 @@ namespace PMC
 
                     var isRightHand = bone.ToString().StartsWith("Right");
 
-                    var landmarks = isRightHand ? _rightHandLandmarks : _leftHandLandmarks;
+                    var landmarks = isRightHand ? _rightHandWorldLandmarks : _leftHandWorldLandmarks;
 
                     var worldTargetDirection = (landmarks[(int)firstLandmark + i + 1].Position - landmarks[(int)firstLandmark + i].Position).normalized;
 
@@ -944,7 +896,9 @@ namespace PMC
             _activePoseLandmark = Set(_poseLandmarks, result.poseLandmarks.landmarks);
             _activePoseWorldLandmark = Set(_poseWorldLandmarks, result.poseWorldLandmarks.landmarks);
             _activeLeftHandLandmark = Set(_leftHandLandmarks, result.leftHandWorldLandmarks.landmarks);
+            _activeleftHandWorldLandmark = Set(_leftHandWorldLandmarks, result.leftHandWorldLandmarks.landmarks);
             _activeRightHandLandmark = Set(_rightHandLandmarks, result.rightHandLandmarks.landmarks);
+            _activerightHandWorldLandmark = Set(_rightHandWorldLandmarks, result.rightHandWorldLandmarks.landmarks);
         }
 
         private bool Set(Landmark[] landmarks, List<Mediapipe.Tasks.Components.Containers.NormalizedLandmark> normalizedLandmarks)

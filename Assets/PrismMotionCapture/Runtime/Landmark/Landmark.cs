@@ -14,7 +14,7 @@ namespace PMC
 
         public Vector3 Position { get; set; }
 
-        public KalmanFilter KalmanFilter { get; set; }
+        public KalmanFilter KalmanFilter { get; set; } = new KalmanFilter();
 
 
         // Methods
