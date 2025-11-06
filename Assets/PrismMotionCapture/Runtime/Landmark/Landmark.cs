@@ -16,6 +16,8 @@ namespace PMC
 
         public KalmanFilter KalmanFilter { get; set; } = new KalmanFilter();
 
+        public OneEuroFilter<Vector3> OneEuroFilter { get; set; }
+
 
         // Methods
 

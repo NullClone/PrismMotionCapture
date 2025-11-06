@@ -197,12 +197,12 @@ VideoPlayer:
   m_TimeReference: 0
   m_TargetMaterialRenderer: {fileID: 0}
   m_TargetMaterialProperty: <noninit>
-  m_RenderMode: 2
+  m_RenderMode: 4
   m_AspectRatio: 2
   m_DataSource: 0
   m_TimeUpdateMode: 2
   m_PlaybackSpeed: 1
-  m_AudioOutputMode: 2
+  m_AudioOutputMode: 0
   m_TargetAudioSources: []
   m_DirectAudioVolumes: []
   m_Url: 
@@ -391,11 +391,17 @@ MonoBehaviour:
   _enableTwistRelaxer: 1
   _enableMovement: 0
   _autoWeight: 1
+  _fingerResetSpeed: 5
   _landmarkScale: {x: 1, y: 1, z: -1}
   _handRotationOffset: {x: 0, y: 90, z: 0}
   _enableKalmanFilter: 1
-  _timeInterval: 0.2
+  _timeInterval: 0.3
   _noise: 0.4
+  _enableOneEuroFilter: 1
+  _filterFrequency: 120
+  _filterMinCutoff: 2
+  _filterBeta: 0.2
+  _filterDcutoff: 1
 --- !u!1001 &318079323
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -949,13 +955,13 @@ MonoBehaviour:
   _assetLoaderType: 2
   _modelAssetPath: holistic_landmarker.bytes
   _imageReadMode: 1
-  _minFaceDetectionConfidence: 0.5
-  _minFaceSuppressionThreshold: 0.5
-  _minFaceLandmarksConfidence: 0.5
-  _minPoseDetectionConfidence: 0.5
-  _minPoseSuppressionThreshold: 0.5
-  _minPoseLandmarksConfidence: 0.5
-  _minHandLandmarksConfidence: 0.5
+  _minFaceDetectionConfidence: 0.75
+  _minFaceSuppressionThreshold: 0.75
+  _minFaceLandmarksConfidence: 0.75
+  _minPoseDetectionConfidence: 0.75
+  _minPoseSuppressionThreshold: 0.75
+  _minPoseLandmarksConfidence: 0.75
+  _minHandLandmarksConfidence: 0.75
   _outputFaceBlendshapes: 0
   _outputSegmentationMask: 0
 --- !u!1 &832575517
@@ -1343,6 +1349,11 @@ PrefabInstance:
       propertyPath: m_AABB.m_Extent.z
       value: 0.1405104
       objectReference: {fileID: 0}
+    - target: {fileID: -4732165671218428268, guid: 5acb1dbfa944c3b4aa1a48683b6756ba,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: -4297446187249348513, guid: 5acb1dbfa944c3b4aa1a48683b6756ba,
         type: 3}
       propertyPath: UpdateType
@@ -1448,6 +1459,11 @@ PrefabInstance:
       propertyPath: m_AABB.m_Extent.z
       value: 0.07423064
       objectReference: {fileID: 0}
+    - target: {fileID: 7146093304296209568, guid: 5acb1dbfa944c3b4aa1a48683b6756ba,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1475,7 +1491,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &2074869028
 RectTransform:
   m_ObjectHideFlags: 0

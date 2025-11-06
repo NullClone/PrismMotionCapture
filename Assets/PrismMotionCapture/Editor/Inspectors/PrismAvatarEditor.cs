@@ -19,6 +19,11 @@ namespace PMC.Editor
         private SerializedProperty _enableKalmanFilter;
         private SerializedProperty _timeInterval;
         private SerializedProperty _noise;
+        private SerializedProperty _enableOneEuroFilter;
+        private SerializedProperty _filterFrequency;
+        private SerializedProperty _filterMinCutoff;
+        private SerializedProperty _filterBeta;
+        private SerializedProperty _filterDcutoff;
 
         private UI.Section[] sections;
 
@@ -36,6 +41,11 @@ namespace PMC.Editor
             _enableKalmanFilter = serializedObject.FindProperty(nameof(_enableKalmanFilter));
             _timeInterval = serializedObject.FindProperty(nameof(_timeInterval));
             _noise = serializedObject.FindProperty(nameof(_noise));
+            _enableOneEuroFilter = serializedObject.FindProperty(nameof(_enableOneEuroFilter));
+            _filterFrequency = serializedObject.FindProperty(nameof(_filterFrequency));
+            _filterMinCutoff = serializedObject.FindProperty(nameof(_filterMinCutoff));
+            _filterBeta = serializedObject.FindProperty(nameof(_filterBeta));
+            _filterDcutoff = serializedObject.FindProperty(nameof(_filterDcutoff));
 
             sections = new UI.Section[]
             {
@@ -92,6 +102,12 @@ namespace PMC.Editor
                 EditorGUILayout.PropertyField(_enableKalmanFilter);
                 EditorGUILayout.PropertyField(_timeInterval);
                 EditorGUILayout.PropertyField(_noise);
+                EditorGUILayout.Space();
+                EditorGUILayout.PropertyField(_enableOneEuroFilter);
+                EditorGUILayout.PropertyField(_filterFrequency);
+                EditorGUILayout.PropertyField(_filterMinCutoff);
+                EditorGUILayout.PropertyField(_filterBeta);
+                EditorGUILayout.PropertyField(_filterDcutoff);
                 EditorGUILayout.Space();
             }
 

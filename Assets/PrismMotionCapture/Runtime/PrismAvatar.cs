@@ -3,6 +3,7 @@ using RootMotion;
 using RootMotion.FinalIK;
 using System.Collections.Generic;
 using UnityEngine;
+using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace PMC
 {
@@ -24,6 +25,11 @@ namespace PMC
         [SerializeField] private bool _enableKalmanFilter = true;
         [SerializeField] private float _timeInterval = 0.45f;
         [SerializeField] private float _noise = 0.4f;
+        [SerializeField] private bool _enableOneEuroFilter = false;
+        [SerializeField] private float _filterFrequency = 120.0f;
+        [SerializeField] private float _filterMinCutoff = 1.0f;
+        [SerializeField] private float _filterBeta = 0.1f;
+        [SerializeField] private float _filterDcutoff = 1.0f;
 
         private Animator _animator;
 
@@ -53,6 +59,7 @@ namespace PMC
 
         private Vector3 _baseScale;
         private Vector3 _basePosition;
+        private Vector3 _baseTrackingPosition;
         private Vector3 _pelvisBasePosition;
         private Quaternion _inverseLeftHandRotation;
         private Quaternion _inverseRightHandRotation;
@@ -65,6 +72,8 @@ namespace PMC
         private bool _activeLeftHandWorldLandmark;
         private bool _activeRightHandLandmark;
         private bool _activeRightHandWorldLandmark;
+
+        private Stopwatch _stopwatch;
 
         private readonly Landmark[] _faceLandmarks = new Landmark[FaceLandmarkCount];
         private readonly Landmark[] _poseLandmarks = new Landmark[PoseLandmarkCount];
@@ -93,6 +102,14 @@ namespace PMC
             var distance = Vector3.Distance(Vector3.zero, _poseWorldLandmarks[(int)PoseLandmark.Nose].Position);
 
             _landmarkScale *= _sittingHeight / distance;
+        }
+
+        [ContextMenu("Reset Position (Play Mode Only)")]
+        public void ResetPosition()
+        {
+            if (!Application.isPlaying) return;
+
+            _baseTrackingPosition = Vector3.zero;
         }
 
 
@@ -158,6 +175,8 @@ namespace PMC
 
         private void Start()
         {
+            _stopwatch = Stopwatch.StartNew();
+
             CreateTarget();
 
             InitializeFinger();
@@ -202,6 +221,11 @@ namespace PMC
                     landmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
                     landmarks[i].KalmanFilter.Predict();
                 }
+
+                if (_enableOneEuroFilter)
+                {
+                    landmarks[i].OneEuroFilter = new OneEuroFilter<Vector3>(_filterFrequency, _filterMinCutoff, _filterBeta, _filterDcutoff);
+                }
             }
         }
 
@@ -221,20 +245,27 @@ namespace PMC
         {
             _root.transform.localRotation = _FBBIK.references.root.rotation;
 
-            if (_activePoseLandmark)
+            if (_activePoseWorldLandmark)
             {
                 UpdateTarget();
 
                 UpdateFBBIK();
+            }
 
-                if (_enableMovement)
+            if (_enableMovement && _activePoseLandmark)
+            {
+                var c_Hip = (_poseLandmarks[(int)PoseLandmark.LeftHip].Position + _poseLandmarks[(int)PoseLandmark.RightHip].Position) / 2;
+
+                if (_baseTrackingPosition == Vector3.zero)
                 {
-                    var c_Hip = (_poseLandmarks[(int)PoseLandmark.LeftHip].Position + _poseLandmarks[(int)PoseLandmark.RightHip].Position) / 2;
-
-                    _root.transform.localPosition = new Vector3(c_Hip.x, c_Hip.y, c_Hip.z) + _basePosition;
-
-                    _FBBIK.references.root.position = _root.transform.localPosition - _pelvisBasePosition;
+                    _baseTrackingPosition = c_Hip;
                 }
+
+                _FBBIK.references.root.position = c_Hip - _baseTrackingPosition + _basePosition;
+
+                _root.transform.localPosition = _FBBIK.references.root.position + _pelvisBasePosition;
+
+                //_FBBIK.references.root.position = _root.transform.localPosition - _pelvisBasePosition;
             }
 
             UpdateFinger();
@@ -273,7 +304,7 @@ namespace PMC
             _VRIK.solver.spine.headClampWeight = 0f;
             _VRIK.solver.spine.maxRootAngle = 20f;
             _VRIK.solver.spine.maintainPelvisPosition = 0f;
-            _VRIK.solver.plantFeet = false;
+            _VRIK.solver.plantFeet = true;
 
             _VRIK.solver.spine.headTarget = _headTarget;
             _VRIK.solver.spine.pelvisTarget = _pelvisTarget;
@@ -427,8 +458,10 @@ namespace PMC
                 _twistRelaxer.twistSolvers[3] = new TwistSolver(_FBBIK.references.rightForearm);
                 _twistRelaxer.twistSolvers[2].children = new Transform[1] { _FBBIK.references.leftHand };
                 _twistRelaxer.twistSolvers[3].children = new Transform[1] { _FBBIK.references.rightHand };
-                _twistRelaxer.twistSolvers[2].parentChildCrossfade = 1f;
-                _twistRelaxer.twistSolvers[3].parentChildCrossfade = 1f;
+                _twistRelaxer.twistSolvers[0].parentChildCrossfade = 0f;
+                _twistRelaxer.twistSolvers[1].parentChildCrossfade = 0f;
+                _twistRelaxer.twistSolvers[2].parentChildCrossfade = 0.5f;
+                _twistRelaxer.twistSolvers[3].parentChildCrossfade = 0.5f;
             }
 
             _FBBIK.solver.IKPositionWeight = 1f;
@@ -590,7 +623,7 @@ namespace PMC
             // Left Hand Rotation
             // --------------------------------------------------
 
-            if (!_activeLeftHandLandmark)
+            if (!_activeLeftHandWorldLandmark)
             {
                 var centerLeftHandPosition = (_poseWorldLandmarks[(int)PoseLandmark.LeftIndex].Position + _poseWorldLandmarks[(int)PoseLandmark.LeftPinky].Position) / 2f;
                 var leftHandForwardVector = (centerLeftHandPosition - _poseWorldLandmarks[(int)PoseLandmark.LeftWrist].Position).normalized;
@@ -614,7 +647,7 @@ namespace PMC
             // Right Hand Rotation
             // --------------------------------------------------
 
-            if (!_activeRightHandLandmark)
+            if (!_activeRightHandWorldLandmark)
             {
                 var centerRightHandPosition = (_poseWorldLandmarks[(int)PoseLandmark.RightIndex].Position + _poseWorldLandmarks[(int)PoseLandmark.RightPinky].Position) / 2f;
                 var rightHandForwardVector = (centerRightHandPosition - _poseWorldLandmarks[(int)PoseLandmark.RightWrist].Position).normalized;
@@ -675,6 +708,8 @@ namespace PMC
             if (_activeLeftHandWorldLandmark)
             {
                 var lHandTransform = _animator.GetBoneTransform(HumanBodyBones.LeftHand);
+
+
 
                 var lHandUp = TriangleNormal(
                                         _leftHandWorldLandmarks[(int)HandLandmark.Wrist].Position,
@@ -873,7 +908,6 @@ namespace PMC
         {
             var handBones = isRightHand ?
                 new[] {
-                    HumanBodyBones.RightHand,
                     HumanBodyBones.RightLittleDistal,
                     HumanBodyBones.RightLittleIntermediate,
                     HumanBodyBones.RightLittleProximal,
@@ -891,7 +925,6 @@ namespace PMC
                     HumanBodyBones.RightThumbProximal,
                 } :
                 new[] {
-                    HumanBodyBones.LeftHand,
                     HumanBodyBones.LeftLittleDistal,
                     HumanBodyBones.LeftLittleIntermediate,
                     HumanBodyBones.LeftLittleProximal,
@@ -982,6 +1015,11 @@ namespace PMC
                 {
                     landmarks[i].Position = landmarks[i].KalmanFilter.Update(landmarks[i].Position);
                 }
+
+                if (_enableOneEuroFilter)
+                {
+                    landmarks[i].Position = landmarks[i].OneEuroFilter.Filter(landmarks[i].Position, (float)_stopwatch.Elapsed.TotalSeconds);
+                }
             }
 
             return true;
@@ -1000,6 +1038,11 @@ namespace PMC
                 if (_enableKalmanFilter)
                 {
                     landmarks[i].Position = landmarks[i].KalmanFilter.Update(landmarks[i].Position);
+                }
+
+                if (_enableOneEuroFilter)
+                {
+                    landmarks[i].Position = landmarks[i].OneEuroFilter.Filter(landmarks[i].Position, (float)_stopwatch.Elapsed.TotalSeconds);
                 }
             }
 
@@ -1021,9 +1064,7 @@ namespace PMC
         {
             var v = Vector3.Cross(a - b, a - c);
 
-            v.Normalize();
-
-            return v;
+            return v.normalized;
         }
     }
 
