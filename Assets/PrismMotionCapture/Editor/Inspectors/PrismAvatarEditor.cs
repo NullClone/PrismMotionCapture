@@ -1,5 +1,4 @@
 using UnityEditor;
-using UnityEngine;
 
 namespace PMC.Editor
 {
@@ -8,7 +7,6 @@ namespace PMC.Editor
     sealed class PrismAvatarEditor : UnityEditor.Editor
     {
         private SerializedProperty m_Script;
-
         private SerializedProperty _tracker;
         private SerializedProperty _IKType;
         private SerializedProperty _enableTwistRelaxer;
@@ -25,12 +23,12 @@ namespace PMC.Editor
         private SerializedProperty _filterBeta;
         private SerializedProperty _filterDcutoff;
 
-        private UI.Section[] sections;
+        private static bool _IKSettingsFoldout;
+        private static bool _filterSettingsFoldout;
 
         private void OnEnable()
         {
             m_Script = serializedObject.FindProperty(nameof(m_Script));
-
             _tracker = serializedObject.FindProperty(nameof(_tracker));
             _IKType = serializedObject.FindProperty(nameof(_IKType));
             _enableTwistRelaxer = serializedObject.FindProperty(nameof(_enableTwistRelaxer));
@@ -46,13 +44,6 @@ namespace PMC.Editor
             _filterMinCutoff = serializedObject.FindProperty(nameof(_filterMinCutoff));
             _filterBeta = serializedObject.FindProperty(nameof(_filterBeta));
             _filterDcutoff = serializedObject.FindProperty(nameof(_filterDcutoff));
-
-            sections = new UI.Section[]
-            {
-                new(this, "GENERAL", new GUIContent("General")),
-                new(this, "IK", new GUIContent("IK")),
-                new(this, "FILTER", new GUIContent("Filter")),
-            };
         }
 
         public override void OnInspectorGUI()
@@ -66,59 +57,85 @@ namespace PMC.Editor
 
             EditorGUILayout.Space();
 
-            sections[0].DrawHeader();
+            EditorGUILayout.PropertyField(_tracker);
 
-            if (EditorGUILayout.BeginFadeGroup(sections[0].anim.faded))
+            EditorGUILayout.Space();
+
+            if (_tracker.objectReferenceValue != null)
             {
-                EditorGUILayout.Space();
-                EditorGUILayout.PropertyField(_tracker);
-                EditorGUILayout.Space();
+                DrawBody();
+            }
+
+            EditorGUILayout.Space();
+
+            EditorGUILayout.LabelField($"{AssetInfo.AssetName} (v{AssetInfo.AssetVersion})", EditorStyles.centeredGreyMiniLabel);
+
+            serializedObject.ApplyModifiedProperties();
+        }
+
+        private void DrawBody()
+        {
+            EditorGUILayout.PropertyField(_IKType);
+
+            EditorGUILayout.Space();
+
+            using (new EditorGUI.IndentLevelScope())
+            {
                 EditorGUILayout.PropertyField(_landmarkScale);
                 EditorGUILayout.PropertyField(_handRotationOffset);
                 EditorGUILayout.Space();
             }
 
-            EditorGUILayout.EndFadeGroup();
+            EditorGUILayout.Space();
 
-            sections[1].DrawHeader();
+            var IKSettingsFoldout = EditorGUILayout.Foldout(_IKSettingsFoldout, "IK Settings", true);
 
-            if (EditorGUILayout.BeginFadeGroup(sections[1].anim.faded))
+            if (IKSettingsFoldout)
             {
-                EditorGUILayout.Space();
-                EditorGUILayout.PropertyField(_IKType);
-                EditorGUILayout.PropertyField(_enableTwistRelaxer);
-                EditorGUILayout.PropertyField(_enableMovement);
-                EditorGUILayout.PropertyField(_autoWeight);
-                EditorGUILayout.Space();
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    EditorGUILayout.PropertyField(_enableTwistRelaxer);
+                    EditorGUILayout.PropertyField(_enableMovement);
+                    EditorGUILayout.PropertyField(_autoWeight);
+                    EditorGUILayout.Space();
+                }
             }
 
-            EditorGUILayout.EndFadeGroup();
-
-            sections[2].DrawHeader();
-
-            if (EditorGUILayout.BeginFadeGroup(sections[2].anim.faded))
-            {
-                EditorGUILayout.Space();
-                EditorGUILayout.PropertyField(_enableKalmanFilter);
-                EditorGUILayout.PropertyField(_timeInterval);
-                EditorGUILayout.PropertyField(_noise);
-                EditorGUILayout.Space();
-                EditorGUILayout.PropertyField(_enableOneEuroFilter);
-                EditorGUILayout.PropertyField(_filterFrequency);
-                EditorGUILayout.PropertyField(_filterMinCutoff);
-                EditorGUILayout.PropertyField(_filterBeta);
-                EditorGUILayout.PropertyField(_filterDcutoff);
-                EditorGUILayout.Space();
-            }
-
-            EditorGUILayout.EndFadeGroup();
-
-            //UI.DrawSplitter();
+            _IKSettingsFoldout = IKSettingsFoldout;
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField($"{AssetInfo.AssetName} (v{AssetInfo.AssetVersion})", EditorStyles.centeredGreyMiniLabel);
 
-            serializedObject.ApplyModifiedProperties();
+            var filterSettingsFoldout = EditorGUILayout.Foldout(_filterSettingsFoldout, "Filter Settings", true);
+
+            if (filterSettingsFoldout)
+            {
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    EditorGUILayout.PropertyField(_enableKalmanFilter);
+
+                    using (new EditorGUI.DisabledGroupScope(!_enableKalmanFilter.boolValue))
+                    {
+                        EditorGUILayout.PropertyField(_timeInterval);
+                        EditorGUILayout.PropertyField(_noise);
+                    }
+
+
+                    EditorGUILayout.Space();
+                    EditorGUILayout.PropertyField(_enableOneEuroFilter);
+
+                    using (new EditorGUI.DisabledGroupScope(!_enableOneEuroFilter.boolValue))
+                    {
+                        EditorGUILayout.PropertyField(_filterFrequency);
+                        EditorGUILayout.PropertyField(_filterMinCutoff);
+                        EditorGUILayout.PropertyField(_filterBeta);
+                        EditorGUILayout.PropertyField(_filterDcutoff);
+                    }
+
+                    EditorGUILayout.Space();
+                }
+            }
+
+            _filterSettingsFoldout = filterSettingsFoldout;
         }
     }
 }
