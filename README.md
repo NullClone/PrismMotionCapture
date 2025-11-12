@@ -1,34 +1,45 @@
 # Prism Motion Capture
 
-Unityでウェブカメラを使用して高精度なモーショントラッキングを実行します。
+Unityで高精度なモーションキャプチャーを実現することができます。<br>
+ウェブカメラや動画ファイルから、リアルタイムで手軽にフルトラッキングが可能です。<br>
 
 ## 使用方法
 
-このリポジトリをクローン、またはダウンロードします。<br>
-Unity 2022.3以上のバージョンでプロジェクトを開きます。<br>
+### サンプルを使用する場合
 
-次に、必要なパッケージをインポートする必要があります。<br>
+このリポジトリをクローン、またはダウンロードします。<br>
+Unity 2022.3以降で、ダウンロードしたフォルダをプロジェクトとして開きます。<br>
+
+### 自分のプロジェクトに追加する場合
+
+まず初めに、必要なパッケージを追加する必要があります。<br>
+※有料アセットのFinalIKを含んでいます。<br>
 
 [<b>FinalIK</b>](https://assetstore.unity.com/packages/tools/animation/final-ik-14290)
 
-バージョン<b>2.4</b>以上をサポートしています。（最新のバージョンを使用することをおすすめします）<br>
+バージョン<b>2.4</b>以上をサポートしています。<br>
 
 1. Package ManagerなどからFinalIKをインポートします。<br>
-2. インポートした後、<b>Plugins/RootMotion</b>フォルダ内にある<b>Import Assembly Definitions</b>パッケージをダブルクリックしてインポートします。
-
-> デモフォルダなどは必須ではないため、インポート時に除外することもできます。
+2. インポートした後、<b>Plugins/RootMotion</b>フォルダ内にある<b>Import Assembly Definitions</b>パッケージをダブルクリックでインポートします。<br>
 
 [<b>MediaPipeUnityPlugin</b>](https://github.com/homuler/MediaPipeUnityPlugin)
 
-バージョン<b>0.16.1</b>以上をサポートしています。（最新のバージョンを使用することをおすすめします）<br>
+バージョン<b>0.16.3</b>以上をサポートしています。（常に最新のバージョンを使用することをおすすめします）<br>
 
-1. リソースページから<b>MediaPipeUnity.[Version].unitypackage</b>をダウンロードします。<br>
-2. ダウンロードしたパッケージをUnityにインポートします。
+- <b>方法1 (推奨)</b>: GitHubの[リリースページ](https://github.com/homuler/MediaPipeUnityPlugin/releases)から、最新の.unitypackageファイルをダウンロードし、Unityにインポートします。<br>
 
-> サンプルが必要ない場合はインポート時に<b>Packages/com.github.homuler.mediapipe</b>のみにチェックをつけてインポートしてください。
+- <b>方法2</b>
 
-<b>※以下のパッケージはすでに追加されています。</b>
+1. パッケージマネージャーを開きます `Window > Package Manager`
 
-[<b>UniVRM</b>](https://github.com/vrm-c/UniVRM)
+2. 左上の`+`ボタンから`Add package from git URL...`を選択します。
+<p align="center">
+  <img width="50%" src="https://github.com/user-attachments/assets/ed1fc738-0412-40e8-aa84-b32b643c31cb">
+</p>
 
-こちらのパッケージはデモで使用されているアバターに必要なものですので、このリポジトリに直接関係があるわけではありません。
+3. 以下のURLを入力します。
+   ```bash
+   https://github.com/homuler/MediaPipeUnityPlugin.git?path=/Packages/com.github.homuler.mediapipe
+   ```
+   
+4. （重要） この方法の場合、ネイティブライブラリが含まれていないため、別途用意する必要がります。自分でビルドするか、このリポジトリのPluginsフォルダにあらかじめ含まれているDllをコピーします。
