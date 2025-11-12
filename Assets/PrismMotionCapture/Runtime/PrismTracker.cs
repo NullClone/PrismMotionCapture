@@ -5,6 +5,7 @@ using Mediapipe.Unity;
 using Mediapipe.Unity.Experimental;
 using System;
 using System.Collections;
+using System.IO;
 using UnityEngine;
 using UnityEngine.Rendering;
 using RunningMode = Mediapipe.Tasks.Vision.Core.RunningMode;
@@ -18,13 +19,8 @@ namespace PMC
         // Fields
 
         [SerializeField] private ImageSource _imageSource;
-        [Space]
-        [SerializeField] private BaseOptions.Delegate _delegate = BaseOptions.Delegate.CPU;
-        [SerializeField] private RunningMode _runningMode = RunningMode.LIVE_STREAM;
-        [SerializeField] private AssetLoaderType _assetLoaderType = AssetLoaderType.Local;
-        [SerializeField] private string _modelAssetPath = "holistic_landmarker.bytes";
         [SerializeField] private ImageReadMode _imageReadMode = ImageReadMode.CPUAsync;
-        [Space]
+        [SerializeField] private string _modelAssetPath = "holistic_landmarker.bytes";
         [SerializeField, Range(0f, 1f)] private float _minFaceDetectionConfidence = 0.5f;
         [SerializeField, Range(0f, 1f)] private float _minFaceSuppressionThreshold = 0.5f;
         [SerializeField, Range(0f, 1f)] private float _minFaceLandmarksConfidence = 0.5f;
@@ -32,43 +28,51 @@ namespace PMC
         [SerializeField, Range(0f, 1f)] private float _minPoseSuppressionThreshold = 0.5f;
         [SerializeField, Range(0f, 1f)] private float _minPoseLandmarksConfidence = 0.5f;
         [SerializeField, Range(0f, 1f)] private float _minHandLandmarksConfidence = 0.5f;
-        [SerializeField] private bool _outputFaceBlendshapes = false;
-        [SerializeField] private bool _outputSegmentationMask = false;
+        [SerializeField] private bool _outputFaceBlendshapes = true;
+        [SerializeField] private bool _outputSegmentationMask = true;
+        [SerializeField] private PrismTrackerPreview _preview;
+        [SerializeField, HideInInspector] private BaseOptions.Delegate _delegate;
+        [SerializeField, HideInInspector] private RunningMode _runningMode = RunningMode.LIVE_STREAM;
 
         private HolisticLandmarker _holisticLandmarker;
         private TextureFramePool _textureFramePool;
         private Stopwatch _stopwatch;
 
 
+        // Events
+
         public event Action<HolisticLandmarkerResult> OnCallback;
 
 
         // Methods
 
-        private IEnumerator Start()
+        private void Awake()
         {
-            if (_imageSource == null) yield break;
+            if (_imageSource == null) return;
 
-            IResourceManager manager = _assetLoaderType switch
+            ResourceUtil.EnableCustomResolver();
+
+            var assetPath = Path.Combine(Application.streamingAssetsPath, _modelAssetPath);
+            var assetName = Path.GetFileName(assetPath);
+
+            if (File.Exists(assetPath))
             {
-                AssetLoaderType.StreamingAssets => new StreamingAssetsResourceManager(),
-                AssetLoaderType.AssetBundle => new AssetBundleResourceManager(""),
-                AssetLoaderType.Local => new LocalResourceManager(),
-                _ => throw new ArgumentOutOfRangeException(),
-            };
-
-            yield return manager.PrepareAssetAsync(_modelAssetPath);
-
-            if (_delegate != BaseOptions.Delegate.CPU)
+                ResourceUtil.SetAssetPath(assetName, assetPath);
+            }
+            else
             {
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
-                Debug.LogWarning("GPU delegate selected on PC platform. Forcing fallback to CPU.");
+                Debug.LogError($"Model asset not found at path: {assetPath}");
 
-                _delegate = BaseOptions.Delegate.CPU;
-#endif
+                return;
             }
 
-            var baseOptions = new BaseOptions(_delegate, _modelAssetPath);
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+            _delegate = BaseOptions.Delegate.CPU;
+#else
+            _delegate = BaseOptions.Delegate.GPU;
+#endif
+
+            var baseOptions = new BaseOptions(_delegate, assetName);
 
             var options = new HolisticLandmarkerOptions(
                 baseOptions,
@@ -87,9 +91,15 @@ namespace PMC
             _holisticLandmarker = HolisticLandmarker.CreateFromOptions(options, GpuManager.GpuResources);
 
             _textureFramePool = new TextureFramePool((int)_imageSource.Resolution.x, (int)_imageSource.Resolution.y, TextureFormat.RGBA32, 10);
+        }
 
-            AsyncGPUReadbackRequest req = default;
-            HolisticLandmarkerResult result = default;
+        private IEnumerator Start()
+        {
+            if (_holisticLandmarker == null) yield break;
+
+            _stopwatch = Stopwatch.StartNew();
+
+            var req = (AsyncGPUReadbackRequest)default;
 
             var waitUntilReqDone = new WaitUntil(() => req.done);
             var waitForEndOfFrame = new WaitForEndOfFrame();
@@ -97,9 +107,6 @@ namespace PMC
             var canUseGpuImage = SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES3 && GpuManager.GpuResources != null;
 
             using var glContext = canUseGpuImage ? GpuManager.GetGlContext() : null;
-
-            _stopwatch = new Stopwatch();
-            _stopwatch.Start();
 
             while (true)
             {
@@ -154,45 +161,7 @@ namespace PMC
                             }
                     }
 
-                    switch (_runningMode)
-                    {
-                        case RunningMode.IMAGE:
-                            {
-                                if (_holisticLandmarker.TryDetect(image, ref result))
-                                {
-                                    OnCallback?.Invoke(result);
-                                }
-                                else
-                                {
-                                    OnCallback?.Invoke(default);
-                                }
-
-                                result.segmentationMask?.Dispose();
-
-                                break;
-                            }
-                        case RunningMode.VIDEO:
-                            {
-                                if (_holisticLandmarker.TryDetectForVideo(image, _stopwatch.ElapsedTicks / 10000, ref result))
-                                {
-                                    OnCallback?.Invoke(result);
-                                }
-                                else
-                                {
-                                    OnCallback?.Invoke(default);
-                                }
-
-                                result.segmentationMask?.Dispose();
-
-                                break;
-                            }
-                        case RunningMode.LIVE_STREAM:
-                            {
-                                _holisticLandmarker.DetectAsync(image, _stopwatch.ElapsedTicks / 10000);
-
-                                break;
-                            }
-                    }
+                    _holisticLandmarker.DetectAsync(image, _stopwatch.ElapsedTicks / 10000);
 
                     image.Dispose();
 
@@ -219,8 +188,11 @@ namespace PMC
             _stopwatch?.Stop();
         }
 
+
         private void ResultCallback(in HolisticLandmarkerResult holisticLandmarkerResult, Image image, long timestampMillisec)
         {
+            _preview.Landmarks = holisticLandmarkerResult.poseWorldLandmarks.landmarks;
+
             OnCallback?.Invoke(holisticLandmarkerResult);
         }
     }
@@ -230,12 +202,5 @@ namespace PMC
         CPU,
         CPUAsync,
         GPU,
-    }
-
-    public enum AssetLoaderType
-    {
-        StreamingAssets,
-        AssetBundle,
-        Local,
     }
 }
