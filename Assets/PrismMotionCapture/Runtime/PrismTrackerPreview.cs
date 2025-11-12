@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using Color = UnityEngine.Color;
 
 namespace PMC
 {
+    [AddComponentMenu("Prism Motion Capture/Prism Tracker Preview")]
     public sealed class PrismTrackerPreview : MonoBehaviour
     {
         // Fields
@@ -61,7 +63,11 @@ namespace PMC
         {
             if (!Application.isPlaying || !enabled) return;
 
-            if (Landmarks != null && Landmarks.Count > 0)
+            if (Landmarks == null) return;
+
+            var landmarks = Landmarks.ToList();
+
+            if (landmarks.Count > 0)
             {
                 Gizmos.color = _connectionColor;
 
@@ -69,20 +75,20 @@ namespace PMC
                 {
                     if (IsVisible(conn.Item1, Mask) && IsVisible(conn.Item2, Mask))
                     {
-                        if (Landmarks.Count < conn.Item1 || Landmarks.Count < conn.Item2) continue;
+                        if (conn.Item1 >= landmarks.Count || conn.Item2 >= landmarks.Count) continue;
 
                         Gizmos.DrawLine(
-                            GetLandmarkPosition(Landmarks[conn.Item1]),
-                            GetLandmarkPosition(Landmarks[conn.Item2]));
+                            GetLandmarkPosition(landmarks[conn.Item1]),
+                            GetLandmarkPosition(landmarks[conn.Item2]));
                     }
                 }
 
-                for (int i = 0; i < Landmarks.Count; i++)
+                for (int i = 0; i < landmarks.Count; i++)
                 {
                     if (IsVisible(i, Mask))
                     {
                         Gizmos.color = GetLandmarkColor(i);
-                        Gizmos.DrawSphere(GetLandmarkPosition(Landmarks[i]), _landmarkRadius);
+                        Gizmos.DrawSphere(GetLandmarkPosition(landmarks[i]), _landmarkRadius);
                     }
                 }
             }
