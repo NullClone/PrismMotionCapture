@@ -32,13 +32,9 @@ namespace PMC
         [SerializeField] private float _filterDcutoff = 1.0f;
 
         private Animator _animator;
-
         private VRIK _VRIK;
-        private VRIKRootController _rootController;
-
         private FullBodyBipedIK _FBBIK;
         private FBBIKHeadEffector _headEffector;
-
         private TwistRelaxer _twistRelaxer;
 
         private Transform _root;
@@ -123,11 +119,6 @@ namespace PMC
                 {
                     _VRIK = gameObject.AddComponent<VRIK>();
                 }
-
-                if (!gameObject.TryGetComponent(out _rootController))
-                {
-                    _rootController = gameObject.AddComponent<VRIKRootController>();
-                }
             }
 
             if (_IKType == IKType.FBBIK)
@@ -138,7 +129,7 @@ namespace PMC
                 }
             }
 
-            if (_enableTwistRelaxer && _IKType == IKType.FBBIK)
+            if (_enableTwistRelaxer)
             {
                 if (!gameObject.TryGetComponent(out _twistRelaxer))
                 {
@@ -146,17 +137,6 @@ namespace PMC
                 }
             }
 
-            InitializeLandmark(_faceLandmarks);
-            InitializeLandmark(_poseLandmarks);
-            InitializeLandmark(_poseWorldLandmarks);
-            InitializeLandmark(_leftHandLandmarks);
-            InitializeLandmark(_leftHandWorldLandmarks);
-            InitializeLandmark(_rightHandLandmarks);
-            InitializeLandmark(_rightHandWorldLandmarks);
-        }
-
-        private void OnEnable()
-        {
             if (_tracker != null)
             {
                 _tracker.OnCallback += OnCallback;
@@ -171,6 +151,14 @@ namespace PMC
             {
                 _FBBIK.solver.OnPreUpdate += OnPreFBBIK;
             }
+
+            InitializeLandmark(_faceLandmarks);
+            InitializeLandmark(_poseLandmarks);
+            InitializeLandmark(_poseWorldLandmarks);
+            InitializeLandmark(_leftHandLandmarks);
+            InitializeLandmark(_leftHandWorldLandmarks);
+            InitializeLandmark(_rightHandLandmarks);
+            InitializeLandmark(_rightHandWorldLandmarks);
         }
 
         private void Start()
@@ -192,7 +180,7 @@ namespace PMC
             }
         }
 
-        private void OnDisable()
+        private void OnDestroy()
         {
             if (_tracker != null)
             {
@@ -303,7 +291,7 @@ namespace PMC
             _VRIK.solver.spine.moveBodyBackWhenCrouching = 0.5f;
             _VRIK.solver.spine.headClampWeight = 0f;
             _VRIK.solver.spine.maxRootAngle = 20f;
-            _VRIK.solver.spine.maintainPelvisPosition = 0f;
+            //_VRIK.solver.spine.maintainPelvisPosition = 1f;
             _VRIK.solver.plantFeet = true;
 
             _VRIK.solver.spine.headTarget = _headTarget;
@@ -317,10 +305,10 @@ namespace PMC
             _VRIK.solver.leftLeg.bendGoal = _leftLegBendGoal;
             _VRIK.solver.rightLeg.bendGoal = _rightLegBendGoal;
 
-            _VRIK.solver.spine.positionWeight = 1f;
+            _VRIK.solver.spine.positionWeight = 0.5f;
             _VRIK.solver.spine.rotationWeight = 1f;
-            _VRIK.solver.spine.pelvisPositionWeight = 1f;
-            _VRIK.solver.spine.pelvisRotationWeight = 1f;
+            _VRIK.solver.spine.pelvisPositionWeight = 0f;
+            _VRIK.solver.spine.pelvisRotationWeight = 0.7f;
             _VRIK.solver.leftArm.positionWeight = 1f;
             _VRIK.solver.leftArm.rotationWeight = 1f;
             _VRIK.solver.leftArm.bendGoalWeight = 1f;
@@ -334,11 +322,11 @@ namespace PMC
             _VRIK.solver.rightLeg.rotationWeight = 1f;
             _VRIK.solver.rightLeg.bendGoalWeight = 1f;
 
-            _VRIK.solver.leftArm.shoulderRotationMode = IKSolverVR.Arm.ShoulderRotationMode.FromTo;
+            //_VRIK.solver.leftArm.shoulderRotationMode = IKSolverVR.Arm.ShoulderRotationMode.FromTo;
             _VRIK.solver.leftArm.shoulderRotationWeight = 0.3f;
             _VRIK.solver.leftArm.shoulderTwistWeight = 0.7f;
 
-            _VRIK.solver.rightArm.shoulderRotationMode = IKSolverVR.Arm.ShoulderRotationMode.FromTo;
+            //_VRIK.solver.rightArm.shoulderRotationMode = IKSolverVR.Arm.ShoulderRotationMode.FromTo;
             _VRIK.solver.rightArm.shoulderRotationWeight = 0.3f;
             _VRIK.solver.rightArm.shoulderTwistWeight = 0.7f;
 
@@ -351,7 +339,21 @@ namespace PMC
             _VRIK.solver.locomotion.stepSpeed = 3f;
             _VRIK.solver.locomotion.weight = 1.0f;
 
-            _rootController.Calibrate();
+            if (_enableTwistRelaxer)
+            {
+                _twistRelaxer.ik = _VRIK;
+                _twistRelaxer.twistSolvers = new TwistSolver[4];
+                _twistRelaxer.twistSolvers[0] = new TwistSolver(_VRIK.references.leftUpperArm);
+                _twistRelaxer.twistSolvers[1] = new TwistSolver(_VRIK.references.rightUpperArm);
+                _twistRelaxer.twistSolvers[2] = new TwistSolver(_VRIK.references.leftForearm);
+                _twistRelaxer.twistSolvers[3] = new TwistSolver(_VRIK.references.rightForearm);
+                _twistRelaxer.twistSolvers[2].children = new Transform[1] { _VRIK.references.leftHand };
+                _twistRelaxer.twistSolvers[3].children = new Transform[1] { _VRIK.references.rightHand };
+                _twistRelaxer.twistSolvers[0].parentChildCrossfade = 0f;
+                _twistRelaxer.twistSolvers[1].parentChildCrossfade = 0f;
+                _twistRelaxer.twistSolvers[2].parentChildCrossfade = 0.5f;
+                _twistRelaxer.twistSolvers[3].parentChildCrossfade = 0.5f;
+            }
 
             _VRIK.solver.IKPositionWeight = 1f;
         }
@@ -590,19 +592,17 @@ namespace PMC
         private void UpdateTarget()
         {
             // --------------------------------------------------
-            // Body Rotation
+            // Body Rotation (Stabilized version)
             // --------------------------------------------------
 
             var centerHipPosition = (_poseWorldLandmarks[(int)PoseLandmark.LeftHip].Position + _poseWorldLandmarks[(int)PoseLandmark.RightHip].Position) / 2f;
             var centerShoulderPosition = (_poseWorldLandmarks[(int)PoseLandmark.LeftShoulder].Position + _poseWorldLandmarks[(int)PoseLandmark.RightShoulder].Position) / 2f;
 
-            var bodyRightVector = (_poseWorldLandmarks[(int)PoseLandmark.RightShoulder].Position - _poseWorldLandmarks[(int)PoseLandmark.LeftShoulder].Position).normalized;
+            var bodyRightVector = (_poseWorldLandmarks[(int)PoseLandmark.RightHip].Position - _poseWorldLandmarks[(int)PoseLandmark.LeftHip].Position).normalized;
             var bodyUpVector = (centerShoulderPosition - centerHipPosition).normalized;
             var bodyForwardVector = Vector3.Cross(bodyRightVector, bodyUpVector).normalized;
 
-            var bodyRotation = LookRotation(bodyForwardVector, bodyUpVector);
-
-            _pelvisTarget.localRotation = bodyRotation;
+            _pelvisTarget.localRotation = LookRotation(bodyForwardVector, bodyUpVector);
 
 
             // --------------------------------------------------
@@ -760,27 +760,26 @@ namespace PMC
 
         private void UpdateVRIK()
         {
+            _VRIK.references.root.position = new Vector3(_pelvisTarget.position.x, _VRIK.references.root.position.y, _pelvisTarget.position.z);
+
+            var pelvisTargetRight = Quaternion.Inverse(_pelvisTarget.rotation) * _VRIK.references.root.right;
+
+            _VRIK.references.root.rotation = Quaternion.LookRotation(Vector3.Cross(_pelvisTarget.rotation * pelvisTargetRight, _VRIK.references.root.up));
+            _VRIK.references.pelvis.position = Vector3.Lerp(_VRIK.references.pelvis.position, _pelvisTarget.position, _VRIK.solver.spine.pelvisPositionWeight);
+            _VRIK.references.pelvis.rotation = Quaternion.Slerp(_VRIK.references.pelvis.rotation, _pelvisTarget.rotation, _VRIK.solver.spine.pelvisRotationWeight);
+
             if (_autoWeight)
             {
                 _VRIK.solver.leftLeg.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility ?? 0f;
                 _VRIK.solver.leftLeg.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility ?? 0f;
-                _VRIK.solver.leftLeg.bendGoalWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftKnee].Visibility ?? 0f;
+                _VRIK.solver.leftLeg.bendGoalWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftKnee].Visibility * _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility ?? 0f;
+
                 _VRIK.solver.rightLeg.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility ?? 0f;
                 _VRIK.solver.rightLeg.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility ?? 0f;
-                _VRIK.solver.rightLeg.bendGoalWeight = _poseWorldLandmarks[(int)PoseLandmark.RightKnee].Visibility ?? 0f;
+                _VRIK.solver.rightLeg.bendGoalWeight = _poseWorldLandmarks[(int)PoseLandmark.RightKnee].Visibility * _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility ?? 0f;
             }
             else
             {
-                if (_poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility > 0.5f &&
-                    _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility > 0.5f)
-                {
-                    _VRIK.solver.locomotion.weight = 0f;
-                }
-                else
-                {
-                    _VRIK.solver.locomotion.weight = 1f;
-                }
-
                 if (_poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility > 0.5f)
                 {
                     _VRIK.solver.leftLeg.positionWeight = 1f;
@@ -1070,7 +1069,7 @@ namespace PMC
 
     public enum IKType
     {
-        VRIK,
-        FBBIK,
+        [InspectorName("VR IK")] VRIK,
+        [InspectorName("Full Body Biped IK")] FBBIK,
     }
 }
