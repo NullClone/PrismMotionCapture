@@ -5,6 +5,11 @@ namespace PMC.Editor
 {
     public static class UI
     {
+        public static void DrawFoot()
+        {
+            EditorGUILayout.LabelField($"{AssetInfo.AssetName} (v{AssetInfo.AssetVersion})", EditorStyles.centeredGreyMiniLabel);
+        }
+
         public static void DrawSplitter(bool isBoxed = false)
         {
             var rect = GUILayoutUtility.GetRect(1f, 1f);

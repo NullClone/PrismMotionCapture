@@ -56,27 +56,9 @@ namespace PMC.Editor
             }
 
             EditorGUILayout.Space();
-
             EditorGUILayout.PropertyField(_tracker);
-
             EditorGUILayout.Space();
-
-            if (_tracker.objectReferenceValue != null)
-            {
-                DrawBody();
-            }
-
-            EditorGUILayout.Space();
-
-            EditorGUILayout.LabelField($"{AssetInfo.AssetName} (v{AssetInfo.AssetVersion})", EditorStyles.centeredGreyMiniLabel);
-
-            serializedObject.ApplyModifiedProperties();
-        }
-
-        private void DrawBody()
-        {
             EditorGUILayout.PropertyField(_IKType);
-
             EditorGUILayout.Space();
 
             using (new EditorGUI.IndentLevelScope())
@@ -136,6 +118,12 @@ namespace PMC.Editor
             }
 
             _filterSettingsFoldout = filterSettingsFoldout;
+
+            EditorGUILayout.Space();
+
+            UI.DrawFoot();
+
+            serializedObject.ApplyModifiedProperties();
         }
     }
 }
