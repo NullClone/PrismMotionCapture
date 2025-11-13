@@ -5,7 +5,9 @@ using Mediapipe.Unity;
 using Mediapipe.Unity.Experimental;
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.Rendering;
 using RunningMode = Mediapipe.Tasks.Vision.Core.RunningMode;
@@ -38,6 +40,17 @@ namespace PMC
         private TextureFramePool _textureFramePool;
         private Stopwatch _stopwatch;
 
+        private bool _initialized = false;
+        private int _resultCallbackCount = 0;
+        private float _fpsTimer = 0f;
+
+
+        // Properties
+
+        public int MediaPipeFPS { get; private set; }
+
+        public ConcurrentQueue<HolisticLandmarkerResult> ResultQueue { get; private set; } = new();
+
 
         // Events
 
@@ -48,7 +61,7 @@ namespace PMC
 
         private void Awake()
         {
-            if (_imageSource == null) return;
+            if (_imageSource == null || !enabled) return;
 
             ResourceUtil.EnableCustomResolver();
 
@@ -91,11 +104,13 @@ namespace PMC
             _holisticLandmarker = HolisticLandmarker.CreateFromOptions(options, GpuManager.GpuResources);
 
             _textureFramePool = new TextureFramePool((int)_imageSource.Resolution.x, (int)_imageSource.Resolution.y, TextureFormat.RGBA32, 10);
+
+            _initialized = true;
         }
 
         private IEnumerator Start()
         {
-            if (_holisticLandmarker == null) yield break;
+            if (!_initialized) yield break;
 
             _stopwatch = Stopwatch.StartNew();
 
@@ -177,6 +192,25 @@ namespace PMC
             }
         }
 
+        private void Update()
+        {
+            if (ResultQueue.TryDequeue(out var result))
+            {
+                _preview.Landmarks = result.poseWorldLandmarks.landmarks;
+
+                OnCallback?.Invoke(result);
+            }
+
+            _fpsTimer += Time.deltaTime;
+
+            if (_fpsTimer >= 1f)
+            {
+                MediaPipeFPS = Interlocked.Exchange(ref _resultCallbackCount, 0);
+
+                _fpsTimer -= 1f;
+            }
+        }
+
         private void OnDestroy()
         {
             _holisticLandmarker?.Close();
@@ -188,12 +222,11 @@ namespace PMC
             _stopwatch?.Stop();
         }
 
-
         private void ResultCallback(in HolisticLandmarkerResult holisticLandmarkerResult, Image image, long timestampMillisec)
         {
-            _preview.Landmarks = holisticLandmarkerResult.poseWorldLandmarks.landmarks;
+            ResultQueue.Enqueue(holisticLandmarkerResult);
 
-            OnCallback?.Invoke(holisticLandmarkerResult);
+            Interlocked.Increment(ref _resultCallbackCount);
         }
     }
 

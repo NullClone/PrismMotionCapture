@@ -63,9 +63,9 @@ namespace PMC
         {
             if (!Application.isPlaying || !enabled) return;
 
-            if (Landmarks == null) return;
+            if (Landmarks == null || Landmarks.Count == 0) return;
 
-            var landmarks = Landmarks.ToList();
+            var landmarks = Landmarks?.ToList();
 
             if (landmarks.Count > 0)
             {
