@@ -12,6 +12,9 @@ namespace PMC.Editor
         private SerializedProperty _enableTwistRelaxer;
         private SerializedProperty _enableMovement;
         private SerializedProperty _autoWeight;
+        private SerializedProperty _fingerResetSpeed;
+        private SerializedProperty _weightSmoothingSpeed;
+        private SerializedProperty _targetRotationSmoothSpeed;
         private SerializedProperty _landmarkScale;
         private SerializedProperty _handRotationOffset;
         private SerializedProperty _enableKalmanFilter;
@@ -34,6 +37,9 @@ namespace PMC.Editor
             _enableTwistRelaxer = serializedObject.FindProperty(nameof(_enableTwistRelaxer));
             _enableMovement = serializedObject.FindProperty(nameof(_enableMovement));
             _autoWeight = serializedObject.FindProperty(nameof(_autoWeight));
+            _fingerResetSpeed = serializedObject.FindProperty(nameof(_fingerResetSpeed));
+            _weightSmoothingSpeed = serializedObject.FindProperty(nameof(_weightSmoothingSpeed));
+            _targetRotationSmoothSpeed = serializedObject.FindProperty(nameof(_targetRotationSmoothSpeed));
             _landmarkScale = serializedObject.FindProperty(nameof(_landmarkScale));
             _handRotationOffset = serializedObject.FindProperty(nameof(_handRotationOffset));
             _enableKalmanFilter = serializedObject.FindProperty(nameof(_enableKalmanFilter));
@@ -79,6 +85,10 @@ namespace PMC.Editor
                     EditorGUILayout.PropertyField(_enableTwistRelaxer);
                     EditorGUILayout.PropertyField(_enableMovement);
                     EditorGUILayout.PropertyField(_autoWeight);
+                    EditorGUILayout.Space();
+                    EditorGUILayout.PropertyField(_weightSmoothingSpeed);
+                    EditorGUILayout.PropertyField(_targetRotationSmoothSpeed);
+                    EditorGUILayout.PropertyField(_fingerResetSpeed);
                     EditorGUILayout.Space();
                 }
             }

@@ -15,17 +15,19 @@ namespace PMC
         // Fields
 
         [SerializeField] private PrismTracker _tracker;
-        [SerializeField] private IKType _IKType = IKType.FBBIK;
+        [SerializeField] private IKType _IKType = IKType.VRIK;
         [SerializeField] private bool _enableTwistRelaxer = true;
-        [SerializeField] private bool _enableMovement = true;
+        [SerializeField] private bool _enableMovement = false;
         [SerializeField] private bool _autoWeight = true;
-        [SerializeField] private float _fingerResetSpeed = 0.01f;
+        [SerializeField] private float _fingerResetSpeed = 5f;
+        [SerializeField] private float _weightSmoothingSpeed = 10f;
+        [SerializeField] private float _targetRotationSmoothSpeed = 20.0f;
         [SerializeField] private Vector3 _landmarkScale = new(1f, 1f, -1f);
         [SerializeField] private Vector3 _handRotationOffset = new(0f, 90f, 0f);
         [SerializeField] private bool _enableKalmanFilter = true;
         [SerializeField] private float _timeInterval = 0.45f;
         [SerializeField] private float _noise = 0.4f;
-        [SerializeField] private bool _enableOneEuroFilter = false;
+        [SerializeField] private bool _enableOneEuroFilter = true;
         [SerializeField] private float _filterFrequency = 120.0f;
         [SerializeField] private float _filterMinCutoff = 1.0f;
         [SerializeField] private float _filterBeta = 0.1f;
@@ -60,6 +62,11 @@ namespace PMC
         private Quaternion _inverseLeftHandRotation;
         private Quaternion _inverseRightHandRotation;
 
+        private float _currentLeftLegWeight = 0f;
+        private float _currentRightLegWeight = 0f;
+        private float _currentLeftBendWeight = 0f;
+        private float _currentRightBendWeight = 0f;
+
         private float _sittingHeight;
         private bool _activeFaceLandmark;
         private bool _activePoseLandmark;
@@ -78,7 +85,6 @@ namespace PMC
         private readonly Landmark[] _leftHandWorldLandmarks = new Landmark[HandLandmarkCount];
         private readonly Landmark[] _rightHandLandmarks = new Landmark[HandLandmarkCount];
         private readonly Landmark[] _rightHandWorldLandmarks = new Landmark[HandLandmarkCount];
-
 
         private readonly Dictionary<HumanBodyBones, Quaternion> _initialLocalRotations = new();
         private readonly Dictionary<HumanBodyBones, Vector3> _initialBoneDirections = new();
@@ -111,6 +117,8 @@ namespace PMC
 
         private void Awake()
         {
+            if (!enabled) return;
+
             _animator = gameObject.GetComponent<Animator>();
 
             if (_IKType == IKType.VRIK)
@@ -163,6 +171,8 @@ namespace PMC
 
         private void Start()
         {
+            if (!enabled) return;
+
             _stopwatch = Stopwatch.StartNew();
 
             CreateTarget();
@@ -182,6 +192,8 @@ namespace PMC
 
         private void OnDestroy()
         {
+            if (!enabled) return;
+
             if (_tracker != null)
             {
                 _tracker.OnCallback -= OnCallback;
@@ -219,13 +231,8 @@ namespace PMC
 
         private void OnPreVRIK()
         {
-            if (_activePoseLandmark)
-            {
-                UpdateTarget();
-
-                UpdateVRIK();
-            }
-
+            UpdateTarget();
+            UpdateVRIK();
             UpdateFinger();
         }
 
@@ -233,12 +240,8 @@ namespace PMC
         {
             _root.transform.localRotation = _FBBIK.references.root.rotation;
 
-            if (_activePoseWorldLandmark)
-            {
-                UpdateTarget();
-
-                UpdateFBBIK();
-            }
+            UpdateTarget();
+            UpdateFBBIK();
 
             if (_enableMovement && _activePoseLandmark)
             {
@@ -591,6 +594,10 @@ namespace PMC
 
         private void UpdateTarget()
         {
+            if (!_activePoseWorldLandmark) return;
+
+            var rotDelta = Time.deltaTime * _targetRotationSmoothSpeed;
+
             // --------------------------------------------------
             // Body Rotation (Stabilized version)
             // --------------------------------------------------
@@ -602,7 +609,8 @@ namespace PMC
             var bodyUpVector = (centerShoulderPosition - centerHipPosition).normalized;
             var bodyForwardVector = Vector3.Cross(bodyRightVector, bodyUpVector).normalized;
 
-            _pelvisTarget.localRotation = LookRotation(bodyForwardVector, bodyUpVector);
+            var targetPelvisRotation = LookRotation(bodyForwardVector, bodyUpVector);
+            _pelvisTarget.localRotation = Quaternion.Slerp(_pelvisTarget.localRotation, targetPelvisRotation, rotDelta);
 
 
             // --------------------------------------------------
@@ -616,12 +624,15 @@ namespace PMC
             var headForwardVector = (centerEyePosition - centerEarPosition).normalized;
             var headUpVector = Vector3.Cross(headForwardVector, headRightVector).normalized;
 
-            _headTarget.localRotation = LookRotation(headForwardVector, headUpVector);
+            var targetHeadRotation = LookRotation(headForwardVector, headUpVector);
+            _headTarget.localRotation = Quaternion.Slerp(_headTarget.localRotation, targetHeadRotation, rotDelta);
 
 
             // --------------------------------------------------
             // Left Hand Rotation
             // --------------------------------------------------
+
+            Quaternion targetLeftHandRotation;
 
             if (!_activeLeftHandWorldLandmark)
             {
@@ -630,7 +641,7 @@ namespace PMC
                 var leftHandRightVector = (_poseWorldLandmarks[(int)PoseLandmark.LeftIndex].Position - _poseWorldLandmarks[(int)PoseLandmark.LeftPinky].Position).normalized;
                 var leftHandUpVector = Vector3.Cross(leftHandForwardVector, leftHandRightVector).normalized;
 
-                _leftHandTarget.localRotation = LookRotation(leftHandForwardVector, leftHandUpVector) * Quaternion.Euler(_handRotationOffset);
+                targetLeftHandRotation = LookRotation(leftHandForwardVector, leftHandUpVector) * Quaternion.Euler(_handRotationOffset);
             }
             else
             {
@@ -639,13 +650,17 @@ namespace PMC
                 var leftHandUpVector = Vector3.Cross(leftHandPinkyToIndex, leftHandWristToMiddle).normalized;
                 var leftHandForwardVector = Vector3.Cross(leftHandUpVector, leftHandPinkyToIndex).normalized;
 
-                _leftHandTarget.localRotation = LookRotation(leftHandForwardVector, -leftHandUpVector) * Quaternion.Euler(_handRotationOffset);
+                targetLeftHandRotation = LookRotation(leftHandForwardVector, -leftHandUpVector) * Quaternion.Euler(_handRotationOffset);
             }
+
+            _leftHandTarget.localRotation = Quaternion.Slerp(_leftHandTarget.localRotation, targetLeftHandRotation, rotDelta);
 
 
             // --------------------------------------------------
             // Right Hand Rotation
             // --------------------------------------------------
+
+            Quaternion targetRightHandRotation;
 
             if (!_activeRightHandWorldLandmark)
             {
@@ -654,7 +669,7 @@ namespace PMC
                 var rightHandRightVector = (_poseWorldLandmarks[(int)PoseLandmark.RightIndex].Position - _poseWorldLandmarks[(int)PoseLandmark.RightPinky].Position).normalized;
                 var rightHandUpVector = Vector3.Cross(-rightHandForwardVector, rightHandRightVector).normalized;
 
-                _rightHandTarget.localRotation = LookRotation(-rightHandForwardVector, rightHandUpVector) * Quaternion.Euler(_handRotationOffset);
+                targetRightHandRotation = LookRotation(-rightHandForwardVector, rightHandUpVector) * Quaternion.Euler(_handRotationOffset);
             }
             else
             {
@@ -663,8 +678,10 @@ namespace PMC
                 var rightHandUpVector = Vector3.Cross(rightHandPinkyToIndex, rightHandWristToMiddle).normalized;
                 var rightHandForwardVector = Vector3.Cross(rightHandUpVector, rightHandPinkyToIndex).normalized;
 
-                _rightHandTarget.localRotation = LookRotation(-rightHandForwardVector, rightHandUpVector) * Quaternion.Euler(_handRotationOffset);
+                targetRightHandRotation = LookRotation(-rightHandForwardVector, rightHandUpVector) * Quaternion.Euler(_handRotationOffset);
             }
+
+            _rightHandTarget.localRotation = Quaternion.Slerp(_rightHandTarget.localRotation, targetRightHandRotation, rotDelta);
 
 
             // --------------------------------------------------
@@ -674,8 +691,11 @@ namespace PMC
             var leftFootForwardVector = (_poseWorldLandmarks[(int)PoseLandmark.LeftFootIndex].Position - _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Position).normalized;
             var rightFootForwardVector = (_poseWorldLandmarks[(int)PoseLandmark.RightFootIndex].Position - _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Position).normalized;
 
-            _leftFootTarget.localRotation = LookRotation(leftFootForwardVector, Vector3.up);
-            _rightFootTarget.localRotation = LookRotation(rightFootForwardVector, Vector3.up);
+            var targetLeftFootRotation = LookRotation(leftFootForwardVector, Vector3.up);
+            var targetRightFootRotation = LookRotation(rightFootForwardVector, Vector3.up);
+
+            _leftFootTarget.localRotation = Quaternion.Slerp(_leftFootTarget.localRotation, targetLeftFootRotation, rotDelta);
+            _rightFootTarget.localRotation = Quaternion.Slerp(_rightFootTarget.localRotation, targetRightFootRotation, rotDelta);
 
 
             // --------------------------------------------------
@@ -708,8 +728,6 @@ namespace PMC
             if (_activeLeftHandWorldLandmark)
             {
                 var lHandTransform = _animator.GetBoneTransform(HumanBodyBones.LeftHand);
-
-
 
                 var lHandUp = TriangleNormal(
                                         _leftHandWorldLandmarks[(int)HandLandmark.Wrist].Position,
@@ -760,6 +778,8 @@ namespace PMC
 
         private void UpdateVRIK()
         {
+            if (!_activePoseWorldLandmark) return;
+
             _VRIK.references.root.position = new Vector3(_pelvisTarget.position.x, _VRIK.references.root.position.y, _pelvisTarget.position.z);
 
             var pelvisTargetRight = Quaternion.Inverse(_pelvisTarget.rotation) * _VRIK.references.root.right;
@@ -770,13 +790,25 @@ namespace PMC
 
             if (_autoWeight)
             {
-                _VRIK.solver.leftLeg.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility ?? 0f;
-                _VRIK.solver.leftLeg.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility ?? 0f;
-                _VRIK.solver.leftLeg.bendGoalWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftKnee].Visibility * _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility ?? 0f;
+                var targetLeftLegWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility ?? 0f;
+                var targetRightLegWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility ?? 0f;
+                var targetLeftBendWeight = (_poseWorldLandmarks[(int)PoseLandmark.LeftKnee].Visibility * _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility) ?? 0f;
+                var targetRightBendWeight = (_poseWorldLandmarks[(int)PoseLandmark.RightKnee].Visibility * _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility) ?? 0f;
 
-                _VRIK.solver.rightLeg.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility ?? 0f;
-                _VRIK.solver.rightLeg.rotationWeight = _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility ?? 0f;
-                _VRIK.solver.rightLeg.bendGoalWeight = _poseWorldLandmarks[(int)PoseLandmark.RightKnee].Visibility * _poseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility ?? 0f;
+                var lerpDelta = Time.deltaTime * _weightSmoothingSpeed;
+
+                _currentLeftLegWeight = Mathf.Lerp(_currentLeftLegWeight, targetLeftLegWeight, lerpDelta);
+                _currentRightLegWeight = Mathf.Lerp(_currentRightLegWeight, targetRightLegWeight, lerpDelta);
+                _currentLeftBendWeight = Mathf.Lerp(_currentLeftBendWeight, targetLeftBendWeight, lerpDelta);
+                _currentRightBendWeight = Mathf.Lerp(_currentRightBendWeight, targetRightBendWeight, lerpDelta);
+
+                _VRIK.solver.leftLeg.positionWeight = _currentLeftLegWeight;
+                _VRIK.solver.leftLeg.rotationWeight = _currentLeftLegWeight;
+                _VRIK.solver.leftLeg.bendGoalWeight = _currentLeftBendWeight;
+
+                _VRIK.solver.rightLeg.positionWeight = _currentRightLegWeight;
+                _VRIK.solver.rightLeg.rotationWeight = _currentRightLegWeight;
+                _VRIK.solver.rightLeg.bendGoalWeight = _currentRightBendWeight;
             }
             else
             {
@@ -824,6 +856,8 @@ namespace PMC
 
         private void UpdateFBBIK()
         {
+            if (!_activePoseWorldLandmark) return;
+
             if (_autoWeight)
             {
                 _FBBIK.solver.leftFootEffector.positionWeight = _poseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility ?? 0f;
@@ -994,7 +1028,7 @@ namespace PMC
             _activeFaceLandmark = Set(_faceLandmarks, result.faceLandmarks.landmarks);
             _activePoseLandmark = Set(_poseLandmarks, result.poseLandmarks.landmarks);
             _activePoseWorldLandmark = Set(_poseWorldLandmarks, result.poseWorldLandmarks.landmarks);
-            _activeLeftHandLandmark = Set(_leftHandLandmarks, result.leftHandWorldLandmarks.landmarks);
+            _activeLeftHandLandmark = Set(_leftHandLandmarks, result.leftHandLandmarks.landmarks);
             _activeLeftHandWorldLandmark = Set(_leftHandWorldLandmarks, result.leftHandWorldLandmarks.landmarks);
             _activeRightHandLandmark = Set(_rightHandLandmarks, result.rightHandLandmarks.landmarks);
             _activeRightHandWorldLandmark = Set(_rightHandWorldLandmarks, result.rightHandWorldLandmarks.landmarks);
