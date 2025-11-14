@@ -5,15 +5,29 @@ Unityで高精度なモーションキャプチャーを実現することがで
 
 ## 使用方法
 
-### サンプルを使用する場合
+### 要件
 
-このリポジトリをクローン、またはダウンロードします。<br>
-Unity 2022.3以降で、ダウンロードしたフォルダをプロジェクトとして開きます。<br>
+本ライブラリには以下の環境が必要です。
+- Unity 2022.3 以降
+- FinalIK (有料アセット)
+- MediaPipeUnityPlugin
 
-### 自分のプロジェクトに追加する場合
+### インストール
 
-まず初めに、必要なパッケージを追加する必要があります。<br>
-※有料アセットのFinalIKを含んでいます。<br>
+先に必要なパッケージをインストールすることをおすすめします。<br>
+
+1. パッケージマネージャーを開きます `Window > Package Manager`
+
+2. 左上の`+`ボタンから`Add package from git URL...`を選択します。
+
+<p align="center">
+  <img width="50%" src="https://github.com/user-attachments/assets/ed1fc738-0412-40e8-aa84-b32b643c31cb">
+</p>
+
+3. 以下のURLを入力します。
+   ```bash
+   https://github.com/NullClone/PrismMotionCapture.git?path=/Assets/PrismMotionCapture/
+   ```
 
 [<b>FinalIK</b>](https://assetstore.unity.com/packages/tools/animation/final-ik-14290)
 
@@ -42,4 +56,8 @@ Unity 2022.3以降で、ダウンロードしたフォルダをプロジェク�
    https://github.com/homuler/MediaPipeUnityPlugin.git?path=/Packages/com.github.homuler.mediapipe
    ```
    
-4. （重要） この方法の場合、ネイティブライブラリが含まれていないため、別途用意する必要がります。自分でビルドするか、このリポジトリのPluginsフォルダにあらかじめ含まれているDllをコピーします。
+4. （重要） この方法の場合、ネイティブライブラリが含まれていないため、別途用意する必要がります。自分でビルドするか、このリポジトリのPluginsフォルダにあるDllをコピーします。
+
+## 使い方
+
+> 追加予定...<br>
