@@ -1,4 +1,5 @@
 using UnityEditor;
+using UnityEngine;
 
 namespace PMC.Editor
 {
@@ -17,6 +18,7 @@ namespace PMC.Editor
         private SerializedProperty _targetRotationSmoothSpeed;
         private SerializedProperty _landmarkScale;
         private SerializedProperty _handRotationOffset;
+        private SerializedProperty _movementScale;
         private SerializedProperty _enableKalmanFilter;
         private SerializedProperty _timeInterval;
         private SerializedProperty _noise;
@@ -42,6 +44,7 @@ namespace PMC.Editor
             _targetRotationSmoothSpeed = serializedObject.FindProperty(nameof(_targetRotationSmoothSpeed));
             _landmarkScale = serializedObject.FindProperty(nameof(_landmarkScale));
             _handRotationOffset = serializedObject.FindProperty(nameof(_handRotationOffset));
+            _movementScale = serializedObject.FindProperty(nameof(_movementScale));
             _enableKalmanFilter = serializedObject.FindProperty(nameof(_enableKalmanFilter));
             _timeInterval = serializedObject.FindProperty(nameof(_timeInterval));
             _noise = serializedObject.FindProperty(nameof(_noise));
@@ -71,6 +74,7 @@ namespace PMC.Editor
             {
                 EditorGUILayout.PropertyField(_landmarkScale);
                 EditorGUILayout.PropertyField(_handRotationOffset);
+                EditorGUILayout.PropertyField(_movementScale);
                 EditorGUILayout.Space();
             }
 
@@ -83,7 +87,7 @@ namespace PMC.Editor
                 using (new EditorGUI.IndentLevelScope())
                 {
                     EditorGUILayout.PropertyField(_enableTwistRelaxer);
-                    EditorGUILayout.PropertyField(_enableMovement);
+                    EditorGUILayout.PropertyField(_enableMovement, new GUIContent("Enable Movement (Beta)"));
                     EditorGUILayout.PropertyField(_autoWeight);
                     EditorGUILayout.Space();
                     EditorGUILayout.PropertyField(_weightSmoothingSpeed);

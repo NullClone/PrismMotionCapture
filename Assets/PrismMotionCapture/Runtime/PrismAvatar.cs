@@ -24,6 +24,7 @@ namespace PMC
         [SerializeField] private float _targetRotationSmoothSpeed = 20.0f;
         [SerializeField] private Vector3 _landmarkScale = new(1f, 1f, -1f);
         [SerializeField] private Vector3 _handRotationOffset = new(0f, 90f, 0f);
+        [SerializeField] private Vector3 _movementScale = new(5.0f, 5.0f, 0f);
         [SerializeField] private bool _enableKalmanFilter = true;
         [SerializeField] private float _timeInterval = 0.45f;
         [SerializeField] private float _noise = 0.4f;
@@ -234,6 +235,24 @@ namespace PMC
             UpdateTarget();
             UpdateVRIK();
             UpdateFinger();
+
+            if (_enableMovement && _activePoseLandmark)
+            {
+                var c_Hip = (_poseLandmarks[(int)PoseLandmark.LeftHip].Position + _poseLandmarks[(int)PoseLandmark.RightHip].Position) / 2;
+
+                if (_baseTrackingPosition == Vector3.zero &&
+                    _poseLandmarks[(int)PoseLandmark.LeftHip].Visibility > 0.75f &&
+                    _poseLandmarks[(int)PoseLandmark.RightHip].Visibility > 0.75f)
+                {
+                    _baseTrackingPosition = c_Hip;
+                }
+
+                var worldMovement = Vector3.Scale(c_Hip - _baseTrackingPosition, _movementScale);
+
+                _VRIK.references.root.position = worldMovement + _basePosition;
+
+                _root.transform.localPosition = _VRIK.references.root.position + _pelvisBasePosition;
+            }
         }
 
         private void OnPreFBBIK()
