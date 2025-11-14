@@ -29,6 +29,8 @@ Unityで高精度なモーションキャプチャーを実現することがで
    https://github.com/NullClone/PrismMotionCapture.git?path=/Assets/PrismMotionCapture/
    ```
 
+### 必要なパッケージ
+
 [<b>FinalIK</b>](https://assetstore.unity.com/packages/tools/animation/final-ik-14290)
 
 バージョン<b>2.4</b>以上をサポートしています。<br>
