@@ -1,9 +1,14 @@
+using Mediapipe.Tasks.Components.Containers;
 using Mediapipe.Tasks.Vision.HolisticLandmarker;
 using RootMotion;
 using RootMotion.FinalIK;
 using System.Collections.Generic;
 using UnityEngine;
 using Stopwatch = System.Diagnostics.Stopwatch;
+
+#if ENABLE_VRM
+using UniVRM10;
+#endif
 
 namespace PMC
 {
@@ -21,24 +26,44 @@ namespace PMC
         [SerializeField] private bool _autoWeight = true;
         [SerializeField] private float _fingerResetSpeed = 5f;
         [SerializeField] private float _weightSmoothingSpeed = 10f;
-        [SerializeField] private float _targetRotationSmoothSpeed = 20.0f;
+        [SerializeField] private float _targetRotationSmoothSpeed = 20f;
         [SerializeField] private Vector3 _landmarkScale = new(1f, 1f, -1f);
         [SerializeField] private Vector3 _handRotationOffset = new(0f, 90f, 0f);
-        [SerializeField] private Vector3 _movementScale = new(5.0f, 5.0f, 0f);
+        [SerializeField] private Vector3 _movementScale = new(5f, 5f, 0f);
         [SerializeField] private bool _enableKalmanFilter = true;
         [SerializeField] private float _timeInterval = 0.45f;
         [SerializeField] private float _noise = 0.4f;
         [SerializeField] private bool _enableOneEuroFilter = true;
-        [SerializeField] private float _filterFrequency = 120.0f;
-        [SerializeField] private float _filterMinCutoff = 1.0f;
+        [SerializeField] private float _filterFrequency = 120f;
+        [SerializeField] private float _filterMinCutoff = 1f;
         [SerializeField] private float _filterBeta = 0.1f;
-        [SerializeField] private float _filterDcutoff = 1.0f;
+        [SerializeField] private float _filterDcutoff = 1f;
+        [SerializeField] private Transform _leftEyeBone;
+        [SerializeField] private Transform _rightEyeBone;
+        [SerializeField] private bool _autoBlink = false;
+        [SerializeField] private bool _linkBlinks = true;
+        [SerializeField] private bool _allowWinking = false;
+        [SerializeField, Range(0f, 1f)] private float _eyeClosedThreshold = 0.65f;
+        [SerializeField, Range(0f, 1f)] private float _eyeOpenedThreshold = 0.15f;
+        [SerializeField, Range(0f, 1f)] private float _smartWinkThreshold = 0.85f;
+        [SerializeField, Range(0f, 1f)] private float _blinkSmoothing = 0.75f;
+        [SerializeField] private bool _gazeTracking = true;
+        [SerializeField, Range(0f, 1f)] private float _gazeSmoothing = 0.6f;
+        [SerializeField, Range(0f, 1f)] private float _gazeStrength = 1f;
+        [SerializeField] private Vector2 _gazeFactor = new(-100f, 100f);
+        [SerializeField, Range(0f, 2f)] private float _mouthOpenSensitivity = 1f;
+        [SerializeField, Range(0f, 2f)] private float _mouthShapeSensitivity = 1f;
+        [SerializeField, Range(0f, 1f)] private float _mouthSmoothing = 0.6f;
 
         private Animator _animator;
         private VRIK _VRIK;
         private FullBodyBipedIK _FBBIK;
         private FBBIKHeadEffector _headEffector;
         private TwistRelaxer _twistRelaxer;
+
+#if ENABLE_VRM
+        private Vrm10Instance _vrm;
+#endif
 
         private Transform _root;
         private Transform _headTarget;
@@ -77,7 +102,66 @@ namespace PMC
         private bool _activeRightHandLandmark;
         private bool _activeRightHandWorldLandmark;
 
+        private float _eyeBlinkLeft;
+        private float _eyeBlinkRight;
+        private float _eyeLookDownLeft;
+        private float _eyeLookDownRight;
+        private float _eyeLookInLeft;
+        private float _eyeLookInRight;
+        private float _eyeLookOutLeft;
+        private float _eyeLookOutRight;
+        private float _eyeLookUpLeft;
+        private float _eyeLookUpRight;
+
+        private float _jawOpen;
+        private float _mouthClose;
+        private float _mouthFunnel;
+        private float _mouthPucker;
+        private float _mouthLeft;
+        private float _mouthRight;
+        private float _mouthSmileLeft;
+        private float _mouthSmileRight;
+        private float _mouthFrownLeft;
+        private float _mouthFrownRight;
+        private float _mouthDimpleLeft;
+        private float _mouthDimpleRight;
+        private float _mouthStretchLeft;
+        private float _mouthStretchRight;
+        private float _mouthRollLower;
+        private float _mouthRollUpper;
+        private float _mouthShrugLower;
+        private float _mouthShrugUpper;
+        private float _mouthPressLeft;
+        private float _mouthPressRight;
+        private float _mouthLowerDownLeft;
+        private float _mouthLowerDownRight;
+        private float _mouthUpperUpLeft;
+        private float _mouthUpperUpRight;
+
+        private float _lastBlinkLeft;
+        private float _lastBlinkRight;
+        private float _lastLookUp;
+        private float _lastLookDown;
+        private float _lastLookLeft;
+        private float _lastLookRight;
+
+        private float _currentBlinkLeft;
+        private float _currentBlinkRight;
+        private float _currentLookUp;
+        private float _currentLookDown;
+        private float _currentLookLeft;
+        private float _currentLookRight;
+
+        private bool _blinking;
+        private float _blinkTimer;
+        private float _nextBlink = 4f;
+        private float _blinkState;
+
         private Stopwatch _stopwatch;
+
+        private readonly TimeInterpolate _blinkInterpolate = new();
+        private readonly TimeInterpolate _gazeInterpolate = new();
+        private readonly TimeInterpolate _mouthInterpolate = new();
 
         private readonly Landmark[] _faceLandmarks = new Landmark[FaceLandmarkCount];
         private readonly Landmark[] _poseLandmarks = new Landmark[PoseLandmarkCount];
@@ -145,6 +229,10 @@ namespace PMC
                     _twistRelaxer = gameObject.AddComponent<TwistRelaxer>();
                 }
             }
+
+#if ENABLE_VRM
+            _vrm = gameObject.GetComponent<Vrm10Instance>();
+#endif
 
             if (_tracker != null)
             {
@@ -236,6 +324,12 @@ namespace PMC
             UpdateVRIK();
             UpdateFinger();
 
+#if ENABLE_VRM
+            UpdateBlink();
+            UpdateGaze();
+            UpdateMouth();
+#endif
+
             if (_enableMovement && _activePoseLandmark)
             {
                 var c_Hip = (_poseLandmarks[(int)PoseLandmark.LeftHip].Position + _poseLandmarks[(int)PoseLandmark.RightHip].Position) / 2;
@@ -261,6 +355,13 @@ namespace PMC
 
             UpdateTarget();
             UpdateFBBIK();
+            UpdateFinger();
+
+#if ENABLE_VRM
+            UpdateBlink();
+            UpdateGaze();
+            UpdateMouth();
+#endif
 
             if (_enableMovement && _activePoseLandmark)
             {
@@ -277,8 +378,6 @@ namespace PMC
 
                 //_FBBIK.references.root.position = _root.transform.localPosition - _pelvisBasePosition;
             }
-
-            UpdateFinger();
         }
 
         private void InitializeVRIK()
@@ -795,6 +894,202 @@ namespace PMC
             }
         }
 
+        private void UpdateFace(List<Category> categories)
+        {
+            if (categories == null || categories.Count == 0) return;
+
+            _eyeBlinkLeft = categories[(int)FaceBlendShapes.EyeBlinkLeft].score;
+            _eyeBlinkRight = categories[(int)FaceBlendShapes.EyeBlinkRight].score;
+            _eyeLookDownLeft = categories[(int)FaceBlendShapes.EyeLookDownLeft].score;
+            _eyeLookDownRight = categories[(int)FaceBlendShapes.EyeLookDownRight].score;
+            _eyeLookInLeft = categories[(int)FaceBlendShapes.EyeLookInLeft].score;
+            _eyeLookInRight = categories[(int)FaceBlendShapes.EyeLookInRight].score;
+            _eyeLookOutLeft = categories[(int)FaceBlendShapes.EyeLookOutLeft].score;
+            _eyeLookOutRight = categories[(int)FaceBlendShapes.EyeLookOutRight].score;
+            _eyeLookUpLeft = categories[(int)FaceBlendShapes.EyeLookUpLeft].score;
+            _eyeLookUpRight = categories[(int)FaceBlendShapes.EyeLookUpRight].score;
+
+            _jawOpen = categories[(int)FaceBlendShapes.JawOpen].score;
+            _mouthClose = categories[(int)FaceBlendShapes.MouthClose].score;
+            _mouthFunnel = categories[(int)FaceBlendShapes.MouthFunnel].score;
+            _mouthPucker = categories[(int)FaceBlendShapes.MouthPucker].score;
+            _mouthLeft = categories[(int)FaceBlendShapes.MouthLeft].score;
+            _mouthRight = categories[(int)FaceBlendShapes.MouthRight].score;
+            _mouthSmileLeft = categories[(int)FaceBlendShapes.MouthSmileLeft].score;
+            _mouthSmileRight = categories[(int)FaceBlendShapes.MouthSmileRight].score;
+            _mouthFrownLeft = categories[(int)FaceBlendShapes.MouthFrownLeft].score;
+            _mouthFrownRight = categories[(int)FaceBlendShapes.MouthFrownRight].score;
+            _mouthDimpleLeft = categories[(int)FaceBlendShapes.MouthDimpleLeft].score;
+            _mouthDimpleRight = categories[(int)FaceBlendShapes.MouthDimpleRight].score;
+            _mouthStretchLeft = categories[(int)FaceBlendShapes.MouthStretchLeft].score;
+            _mouthStretchRight = categories[(int)FaceBlendShapes.MouthStretchRight].score;
+            _mouthRollLower = categories[(int)FaceBlendShapes.MouthRollLower].score;
+            _mouthRollUpper = categories[(int)FaceBlendShapes.MouthRollUpper].score;
+            _mouthShrugLower = categories[(int)FaceBlendShapes.MouthShrugLower].score;
+            _mouthShrugUpper = categories[(int)FaceBlendShapes.MouthShrugUpper].score;
+            _mouthPressLeft = categories[(int)FaceBlendShapes.MouthPressLeft].score;
+            _mouthPressRight = categories[(int)FaceBlendShapes.MouthPressRight].score;
+            _mouthLowerDownLeft = categories[(int)FaceBlendShapes.MouthLowerDownLeft].score;
+            _mouthLowerDownRight = categories[(int)FaceBlendShapes.MouthLowerDownRight].score;
+            _mouthUpperUpLeft = categories[(int)FaceBlendShapes.MouthUpperUpLeft].score;
+            _mouthUpperUpRight = categories[(int)FaceBlendShapes.MouthUpperUpRight].score;
+        }
+
+#if ENABLE_VRM
+
+        private void UpdateBlink()
+        {
+            if (_vrm == null) return;
+
+            if (_autoBlink)
+            {
+                if (_blinking)
+                {
+                    _blinkState += Time.deltaTime * 20f;
+
+                    if (_blinkState >= 2.0)
+                    {
+                        _blinking = false;
+                        _blinkState = 0.0f;
+                        _blinkTimer = Time.time;
+                        _nextBlink = Random.Range(1f, 4f);
+                    }
+                }
+                else if (Time.time - _blinkTimer > _nextBlink)
+                {
+                    _blinking = true;
+                }
+
+                var weight = _blinkState <= 1.0 ? _blinkState : 2f - _blinkState;
+
+                _vrm.Runtime.Expression.SetWeight(ExpressionKey.Blink, weight);
+            }
+            else
+            {
+                var targetLeft = CalculateBlinkValueFromARKit(_eyeBlinkLeft, _eyeOpenedThreshold, _eyeClosedThreshold);
+                var targetRight = CalculateBlinkValueFromARKit(_eyeBlinkRight, _eyeOpenedThreshold, _eyeClosedThreshold);
+
+                var t = _blinkInterpolate.Interpolate();
+                var smoothedLeft = Mathf.Lerp(_lastBlinkLeft, _currentBlinkLeft, t);
+                var smoothedRight = Mathf.Lerp(_lastBlinkRight, _currentBlinkRight, t);
+
+                if (_linkBlinks && !_allowWinking)
+                {
+                    var weight = Mathf.Max(smoothedLeft, smoothedRight);
+
+                    _vrm.Runtime.Expression.SetWeight(ExpressionKey.Blink, weight);
+                }
+                else
+                {
+                    _vrm.Runtime.Expression.SetWeight(ExpressionKey.BlinkLeft, smoothedLeft);
+                    _vrm.Runtime.Expression.SetWeight(ExpressionKey.BlinkRight, smoothedRight);
+                }
+
+                _blinkInterpolate.UpdateTime(Time.timeAsDouble);
+
+                if (_linkBlinks && _allowWinking && Mathf.Abs(targetRight - targetLeft) < _smartWinkThreshold)
+                {
+                    var maxBlink = Mathf.Max(targetLeft, targetRight);
+
+                    targetLeft = maxBlink;
+                    targetRight = maxBlink;
+                }
+
+                _lastBlinkLeft = smoothedLeft;
+                _lastBlinkRight = smoothedRight;
+
+                _currentBlinkLeft = Mathf.Lerp(_currentBlinkLeft, targetLeft, 1f - _blinkSmoothing);
+                _currentBlinkRight = Mathf.Lerp(_currentBlinkRight, targetRight, 1f - _blinkSmoothing);
+            }
+        }
+
+        private void UpdateGaze()
+        {
+            if (_vrm == null || !_gazeTracking) return;
+
+            var targetLookUp = (_eyeLookUpLeft + _eyeLookUpRight) / 2f;
+            var targetLookDown = (_eyeLookDownLeft + _eyeLookDownRight) / 2f;
+            var targetLookLeft = (_eyeLookInLeft + _eyeLookOutRight) / 2f;
+            var targetLookRight = (_eyeLookOutLeft + _eyeLookInRight) / 2f;
+
+            var t = _gazeInterpolate.Interpolate();
+
+            var smoothedLookUp = Mathf.Lerp(_lastLookUp, targetLookUp, 1f - _gazeSmoothing);
+            var smoothedLookDown = Mathf.Lerp(_lastLookDown, targetLookDown, 1f - _gazeSmoothing);
+            var smoothedLookLeft = Mathf.Lerp(_lastLookLeft, targetLookLeft, 1f - _gazeSmoothing);
+            var smoothedLookRight = Mathf.Lerp(_lastLookRight, targetLookRight, 1f - _gazeSmoothing);
+
+            _lastLookUp = smoothedLookUp;
+            _lastLookDown = smoothedLookDown;
+            _lastLookLeft = smoothedLookLeft;
+            _lastLookRight = smoothedLookRight;
+
+            _currentLookUp = smoothedLookUp;
+            _currentLookDown = smoothedLookDown;
+            _currentLookLeft = smoothedLookLeft;
+            _currentLookRight = smoothedLookRight;
+
+            _gazeInterpolate.UpdateTime(Time.timeAsDouble);
+
+            if (_leftEyeBone != null && _rightEyeBone != null)
+            {
+                var lookUpDown = _currentLookUp - _currentLookDown;
+                var lookLeftRight = _currentLookRight - _currentLookLeft;
+
+                _vrm.Runtime.LookAt.SetYawPitchManually(
+                    _gazeFactor.x * _gazeStrength * lookLeftRight,
+                    _gazeFactor.y * _gazeStrength * lookUpDown);
+            }
+
+            //_vrm.Runtime.Expression.SetWeight(ExpressionKey.LookUp, _currentLookUp * _gazeStrength);
+            //_vrm.Runtime.Expression.SetWeight(ExpressionKey.LookDown, _currentLookDown * _gazeStrength);
+            //_vrm.Runtime.Expression.SetWeight(ExpressionKey.LookLeft, _currentLookLeft * _gazeStrength);
+            //_vrm.Runtime.Expression.SetWeight(ExpressionKey.LookRight, _currentLookRight * _gazeStrength);
+        }
+
+        private void UpdateMouth()
+        {
+            if (_vrm == null) return;
+
+            var t = _mouthInterpolate.Interpolate();
+
+            var mouthOpen = _jawOpen * _mouthOpenSensitivity;
+            var au = Mathf.Lerp(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Aa), mouthOpen, 1f - _mouthSmoothing);
+
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Aa, au);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ih, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ou, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ee, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Oh, 0);
+
+            var smile = (_mouthSmileLeft + _mouthSmileRight) / 2f * _mouthShapeSensitivity;
+            var frown = (_mouthFrownLeft + _mouthFrownRight) / 2f * _mouthShapeSensitivity;
+            var pucker = _mouthPucker * _mouthShapeSensitivity;
+            var funnel = _mouthFunnel * _mouthShapeSensitivity;
+            var shapeTotal = smile + frown + pucker + funnel;
+
+            if (shapeTotal > 1.0f)
+            {
+                smile /= shapeTotal;
+                frown /= shapeTotal;
+                pucker /= shapeTotal;
+                funnel /= shapeTotal;
+            }
+
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Happy, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Sad, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Relaxed, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Surprised, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Happy, Mathf.Lerp(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Happy), smile, 1f - _mouthSmoothing));
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Sad, Mathf.Lerp(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Sad), frown, 1f - _mouthSmoothing));
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Oh, Mathf.Max(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Oh), pucker));
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ou, Mathf.Max(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Ou), funnel));
+
+            _mouthInterpolate.UpdateTime(Time.timeAsDouble);
+        }
+
+#endif
+
         private void UpdateVRIK()
         {
             if (!_activePoseWorldLandmark) return;
@@ -1051,9 +1346,11 @@ namespace PMC
             _activeLeftHandWorldLandmark = Set(_leftHandWorldLandmarks, result.leftHandWorldLandmarks.landmarks);
             _activeRightHandLandmark = Set(_rightHandLandmarks, result.rightHandLandmarks.landmarks);
             _activeRightHandWorldLandmark = Set(_rightHandWorldLandmarks, result.rightHandWorldLandmarks.landmarks);
+
+            UpdateFace(result.faceBlendshapes.categories);
         }
 
-        private bool Set(Landmark[] landmarks, List<Mediapipe.Tasks.Components.Containers.NormalizedLandmark> normalizedLandmarks)
+        private bool Set(Landmark[] landmarks, List<NormalizedLandmark> normalizedLandmarks)
         {
             if (normalizedLandmarks == null || normalizedLandmarks.Count == 0) return false;
 
@@ -1118,11 +1415,50 @@ namespace PMC
 
             return v.normalized;
         }
+
+        private static float CalculateBlinkValueFromARKit(float arkitScore, float openedThreshold, float closedThreshold)
+        {
+            if (arkitScore >= openedThreshold)
+            {
+                if (arkitScore <= closedThreshold)
+                {
+                    return (arkitScore - openedThreshold) / (closedThreshold - openedThreshold);
+                }
+
+                return 1f;
+            }
+            return 0f;
+        }
     }
 
     public enum IKType
     {
         [InspectorName("VR IK")] VRIK,
         [InspectorName("Full Body Biped IK")] FBBIK,
+    }
+
+    public class TimeInterpolate
+    {
+        private float updateT;
+        private double lastT;
+        private double currentT;
+        private int gotData;
+
+        public void UpdateTime(double nowT)
+        {
+            this.updateT = Time.time;
+            this.lastT = this.currentT;
+            this.currentT = nowT;
+            if (this.gotData >= 2) return;
+            ++this.gotData;
+        }
+
+        public float Interpolate()
+        {
+            if (this.gotData < 2) return 0.0f;
+            float timeDiff = (float)(this.currentT - this.lastT);
+            if (timeDiff <= 0) return 0.0f;
+            return Mathf.Min((Time.time - this.updateT) / timeDiff, 1.0f);
+        }
     }
 }

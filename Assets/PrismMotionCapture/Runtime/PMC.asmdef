@@ -3,7 +3,8 @@
     "rootNamespace": "",
     "references": [
         "GUID:04c4d86a70aa56c55a78c61f1ab1a56d",
-        "GUID:6d4810c931e638d489b58e9b332f3fb9"
+        "GUID:6d4810c931e638d489b58e9b332f3fb9",
+        "GUID:e47c917724578cc43b5506c17a27e9a0"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -11,7 +12,15 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [],
-    "versionDefines": [],
+    "defineConstraints": [
+        "ENABLE_VRM"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.vrmc.vrm",
+            "expression": "",
+            "define": "ENABLE_VRM"
+        }
+    ],
     "noEngineReferences": false
 }
