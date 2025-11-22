@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using Color = UnityEngine.Color;
 
@@ -11,14 +10,16 @@ namespace PMC
     {
         // Fields
 
+        [SerializeField] private PrismTracker _tracker;
         [SerializeField] private float _landmarkRadius = 0.01f;
         [SerializeField] private Color _leftLandmarkColor = Color.green;
         [SerializeField] private Color _rightLandmarkColor = Color.cyan;
         [SerializeField] private Color _centerLandmarkColor = Color.white;
         [SerializeField] private Color _connectionColor = Color.red;
-        [SerializeField] private Vector3 _landmarkPosition = Vector3.zero;
-        [SerializeField] private Vector3 _landmarkScale = Vector3.one;
 
+        private Vector3 _baseTrackingPosition;
+
+        private Vector3[] _positions;
 
         private static readonly HashSet<int> _LeftLandmarks = new() { 1, 2, 3, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31 };
 
@@ -50,9 +51,9 @@ namespace PMC
 
         // Properties
 
-        public IReadOnlyList<Mediapipe.Tasks.Components.Containers.Landmark> Landmarks { get; set; }
-
         public BodyParts Mask { get; set; } = BodyParts.All;
+
+        public Vector3 LandmarkPosition = Vector3.zero;
 
         public bool VisualizeZ { get; set; } = true;
 
@@ -63,34 +64,46 @@ namespace PMC
         {
             if (!Application.isPlaying || !enabled) return;
 
-            if (Landmarks == null || Landmarks.Count == 0) return;
+            _positions = _tracker.LocalAvatarSpacePoints;
 
-            var landmarks = Landmarks?.ToList();
+            if (_positions == null) return;
 
-            if (landmarks.Count > 0)
+            Gizmos.color = _connectionColor;
+
+            foreach (var conn in _Connections)
             {
-                Gizmos.color = _connectionColor;
-
-                foreach (var conn in _Connections)
+                if (IsVisible(conn.Item1, Mask) && IsVisible(conn.Item2, Mask))
                 {
-                    if (IsVisible(conn.Item1, Mask) && IsVisible(conn.Item2, Mask))
-                    {
-                        if (conn.Item1 >= landmarks.Count || conn.Item2 >= landmarks.Count) continue;
+                    if (conn.Item1 >= _positions.Length || conn.Item2 >= _positions.Length) continue;
 
-                        Gizmos.DrawLine(
-                            GetLandmarkPosition(landmarks[conn.Item1]),
-                            GetLandmarkPosition(landmarks[conn.Item2]));
-                    }
+                    Gizmos.DrawLine(_positions[conn.Item1] + LandmarkPosition, _positions[conn.Item2] + LandmarkPosition);
                 }
+            }
 
-                for (int i = 0; i < landmarks.Count; i++)
+            for (int i = 0; i < _positions.Length; i++)
+            {
+                if (IsVisible(i, Mask))
                 {
-                    if (IsVisible(i, Mask))
-                    {
-                        Gizmos.color = GetLandmarkColor(i);
-                        Gizmos.DrawSphere(GetLandmarkPosition(landmarks[i]), _landmarkRadius);
-                    }
+                    Gizmos.color = GetLandmarkColor(i);
+                    Gizmos.DrawSphere(_positions[i] + LandmarkPosition, _landmarkRadius);
                 }
+            }
+
+            if (_tracker.GlobalAvatarPosition != Vector3.zero && _baseTrackingPosition == Vector3.zero)
+            {
+                _baseTrackingPosition = -_tracker.GlobalAvatarPosition;
+            }
+        }
+
+        private void Set(IReadOnlyList<Mediapipe.Tasks.Components.Containers.Landmark> landmarks)
+        {
+            if (landmarks == null || landmarks.Count == 0) return;
+
+            _positions ??= new Vector3[landmarks.Count];
+
+            for (int i = 0; i < _positions.Length; i++)
+            {
+                _positions[i] = new Vector3(landmarks[i].x, landmarks[i].y, VisualizeZ ? landmarks[i].z : 0f);
             }
         }
 
@@ -146,17 +159,6 @@ namespace PMC
             }
 
             return _centerLandmarkColor;
-        }
-
-        private Vector3 GetLandmarkPosition(Mediapipe.Tasks.Components.Containers.Landmark lm)
-        {
-            var localPos = new Vector3(
-                lm.x,
-                lm.y,
-                VisualizeZ ? lm.z : 0f
-            );
-
-            return Vector3.Scale(localPos, _landmarkScale) + _landmarkPosition;
         }
     }
 
