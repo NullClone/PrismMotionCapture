@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace PMC
+namespace PMC.Utilities
 {
     public static class UnityUtils
     {

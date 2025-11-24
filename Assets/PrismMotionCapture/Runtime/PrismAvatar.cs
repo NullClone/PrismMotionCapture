@@ -1,14 +1,11 @@
 using Mediapipe.Tasks.Components.Containers;
-using Mediapipe.Tasks.Vision.HolisticLandmarker;
+using PMC.Utilities;
 using RootMotion;
 using RootMotion.FinalIK;
 using System.Collections.Generic;
 using UnityEngine;
-using Stopwatch = System.Diagnostics.Stopwatch;
-
-#if ENABLE_VRM
 using UniVRM10;
-#endif
+using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace PMC
 {
@@ -53,13 +50,12 @@ namespace PMC
         private FBBIKHeadEffector _headEffector;
         private TwistRelaxer _twistRelaxer;
 
-#if ENABLE_VRM
         private Vrm10Instance _vrm;
-#endif
 
         private Transform _root;
         private Transform _headTarget;
         private Transform _pelvisTarget;
+        private Transform _chestGoal;
         private Transform _leftHandTarget;
         private Transform _rightHandTarget;
         private Transform _leftArmBendGoal;
@@ -184,14 +180,7 @@ namespace PMC
                 }
             }
 
-#if ENABLE_VRM
             _vrm = gameObject.GetComponent<Vrm10Instance>();
-#endif
-
-            if (_tracker != null)
-            {
-                _tracker.OnCallback += OnCallback;
-            }
 
             if (_IKType == IKType.VRIK)
             {
@@ -229,11 +218,6 @@ namespace PMC
         {
             if (!enabled) return;
 
-            if (_tracker != null)
-            {
-                _tracker.OnCallback -= OnCallback;
-            }
-
             if (_IKType == IKType.VRIK)
             {
                 _VRIK.solver.OnPreUpdate -= OnPreVRIK;
@@ -247,7 +231,7 @@ namespace PMC
 
         private void OnPreVRIK()
         {
-            Movement();
+            UpdateMovement();
 
             var pelvisTargetRight = Quaternion.Inverse(_pelvisTarget.rotation) * _VRIK.references.root.right;
 
@@ -258,69 +242,26 @@ namespace PMC
             UpdateVRIK();
             UpdateFinger();
 
-#if ENABLE_VRM
             if (_enableFaceTracking)
             {
                 UpdateBlink();
                 UpdateGaze();
                 UpdateMouth();
             }
-#endif
         }
 
         private void OnPreFBBIK()
         {
-            Movement();
-
+            UpdateMovement();
             UpdateTarget();
             UpdateFBBIK();
             UpdateFinger();
 
-#if ENABLE_VRM
             if (_enableFaceTracking)
             {
                 UpdateBlink();
                 UpdateGaze();
                 UpdateMouth();
-            }
-#endif
-        }
-
-        private void Movement()
-        {
-            if (_tracker.ActivePoseWorldLandmark)
-            {
-                for (int i = 0; i < PrismTracker.PoseLandmarkCount; i++)
-                {
-                    _tracker.PoseWorldLandmarks[i].Position = _tracker.LocalAvatarSpacePoints[i];
-                }
-            }
-
-            if (_enableMovement)
-            {
-                var pos = _tracker.GlobalAvatarPosition;
-
-                pos.y *= -1f;
-                pos.z *= -1f;
-
-                if (_tracker.GlobalAvatarPosition != Vector3.zero && _baseTrackingPosition == Vector3.zero)
-                {
-                    _baseTrackingPosition = pos;
-
-                    _basePosition.y += _pelvisBasePosition.y;
-                }
-
-                _root.position = pos - _baseTrackingPosition + _basePosition;
-                _root.rotation = _tracker.GlobalAvatarRotation;
-
-                if (_IKType == IKType.VRIK)
-                {
-                    _VRIK.references.root.position = _root.position - _pelvisBasePosition;
-                }
-                else
-                {
-                    _FBBIK.references.root.position = _root.position - _pelvisBasePosition;
-                }
             }
         }
 
@@ -340,6 +281,7 @@ namespace PMC
             _root.position = _VRIK.references.pelvis.position;
             _headTarget.position = _VRIK.references.head.position;
             _pelvisTarget.position = _VRIK.references.pelvis.position;
+            _chestGoal.position = _VRIK.references.chest.position;
             _leftHandTarget.position = _VRIK.references.leftHand.position;
             _rightHandTarget.position = _VRIK.references.rightHand.position;
             _leftArmBendGoal.position = _VRIK.references.leftForearm.position;
@@ -356,11 +298,12 @@ namespace PMC
             _VRIK.solver.spine.moveBodyBackWhenCrouching = 0.5f;
             _VRIK.solver.spine.headClampWeight = 0f;
             _VRIK.solver.spine.maxRootAngle = 20f;
-            //_VRIK.solver.spine.maintainPelvisPosition = 1f;
+            _VRIK.solver.spine.maintainPelvisPosition = 0.2f;
             _VRIK.solver.plantFeet = true;
 
             _VRIK.solver.spine.headTarget = _headTarget;
             _VRIK.solver.spine.pelvisTarget = _pelvisTarget;
+            _VRIK.solver.spine.chestGoal = _chestGoal;
             _VRIK.solver.leftArm.target = _leftHandTarget;
             _VRIK.solver.rightArm.target = _rightHandTarget;
             _VRIK.solver.leftArm.bendGoal = _leftArmBendGoal;
@@ -372,8 +315,9 @@ namespace PMC
 
             _VRIK.solver.spine.positionWeight = 0.5f;
             _VRIK.solver.spine.rotationWeight = 1f;
-            _VRIK.solver.spine.pelvisPositionWeight = 0f;
-            _VRIK.solver.spine.pelvisRotationWeight = 0.7f;
+            _VRIK.solver.spine.pelvisPositionWeight = 1f;
+            _VRIK.solver.spine.pelvisRotationWeight = 1f;
+            _VRIK.solver.spine.chestGoalWeight = 1f;
             _VRIK.solver.leftArm.positionWeight = 1f;
             _VRIK.solver.leftArm.rotationWeight = 1f;
             _VRIK.solver.leftArm.bendGoalWeight = 1f;
@@ -387,11 +331,11 @@ namespace PMC
             _VRIK.solver.rightLeg.rotationWeight = 1f;
             _VRIK.solver.rightLeg.bendGoalWeight = 1f;
 
-            //_VRIK.solver.leftArm.shoulderRotationMode = IKSolverVR.Arm.ShoulderRotationMode.FromTo;
+            _VRIK.solver.leftArm.shoulderRotationMode = IKSolverVR.Arm.ShoulderRotationMode.FromTo;
             _VRIK.solver.leftArm.shoulderRotationWeight = 0.3f;
             _VRIK.solver.leftArm.shoulderTwistWeight = 0.7f;
 
-            //_VRIK.solver.rightArm.shoulderRotationMode = IKSolverVR.Arm.ShoulderRotationMode.FromTo;
+            _VRIK.solver.rightArm.shoulderRotationMode = IKSolverVR.Arm.ShoulderRotationMode.FromTo;
             _VRIK.solver.rightArm.shoulderRotationWeight = 0.3f;
             _VRIK.solver.rightArm.shoulderTwistWeight = 0.7f;
 
@@ -625,6 +569,7 @@ namespace PMC
             _root = new GameObject($"{name} (Tracking Space)").transform;
             _headTarget = new GameObject("Head Target").transform;
             _pelvisTarget = new GameObject("Pelvis Target").transform;
+            _chestGoal = new GameObject("Chest Goal").transform;
             _leftHandTarget = new GameObject("Left Hand Target").transform;
             _rightHandTarget = new GameObject("Right Hand Target").transform;
             _leftArmBendGoal = new GameObject("Left Arm Bend Goal").transform;
@@ -640,6 +585,7 @@ namespace PMC
 
             _headTarget.parent = _root;
             _pelvisTarget.parent = _root;
+            _chestGoal.parent = _root;
             _leftHandTarget.parent = _root;
             _rightHandTarget.parent = _root;
             _leftArmBendGoal.parent = _root;
@@ -652,6 +598,44 @@ namespace PMC
             _rightLegBendGoal.parent = _root;
             _leftThighTarget.parent = _root;
             _rightThighTarget.parent = _root;
+        }
+
+        private void UpdateMovement()
+        {
+            if (_tracker.ActivePoseWorldLandmark)
+            {
+                for (int i = 0; i < PrismTracker.PoseLandmarkCount; i++)
+                {
+                    _tracker.PoseWorldLandmarks[i].Position = _tracker.LocalAvatarSpacePoints[i];
+                }
+            }
+
+            if (_enableMovement)
+            {
+                var pos = _tracker.GlobalAvatarPosition;
+
+                pos.y *= -1f;
+                pos.z *= -1f;
+
+                if (_tracker.GlobalAvatarPosition != Vector3.zero && _baseTrackingPosition == Vector3.zero)
+                {
+                    _baseTrackingPosition = pos;
+
+                    _basePosition.y += _pelvisBasePosition.y;
+                }
+
+                _root.position = pos - _baseTrackingPosition + _basePosition;
+                _root.rotation = _tracker.GlobalAvatarRotation;
+
+                if (_IKType == IKType.VRIK)
+                {
+                    _VRIK.references.root.position = _root.position - _pelvisBasePosition;
+                }
+                else
+                {
+                    _FBBIK.references.root.position = _root.position - _pelvisBasePosition;
+                }
+            }
         }
 
         private void UpdateTarget()
@@ -688,6 +672,17 @@ namespace PMC
 
             var targetHeadRotation = UnityUtils.LookRotation(headForwardVector, headUpVector);
             _headTarget.localRotation = Quaternion.Slerp(_headTarget.localRotation, targetHeadRotation, rotDelta);
+
+
+            // --------------------------------------------------
+            // Chest
+            // --------------------------------------------------
+
+            var leftShoulderPos = _tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftShoulder].Position;
+            var rightShoulderPos = _tracker.PoseWorldLandmarks[(int)PoseLandmark.RightShoulder].Position;
+            var chestPos = (leftShoulderPos + rightShoulderPos) * 0.5f;
+
+            _chestGoal.localPosition = chestPos;
 
 
             // --------------------------------------------------
@@ -881,8 +876,6 @@ namespace PMC
             _mouthUpperUpRight = categories[(int)FaceBlendShapes.MouthUpperUpRight].score;
         }
 
-#if ENABLE_VRM
-
         private void UpdateBlink()
         {
             if (_vrm == null) return;
@@ -1033,8 +1026,6 @@ namespace PMC
 
             _mouthInterpolate.UpdateTime(Time.timeAsDouble);
         }
-
-#endif
 
         private void UpdateVRIK()
         {
@@ -1274,11 +1265,6 @@ namespace PMC
             }
         }
 
-        private void OnCallback(HolisticLandmarkerResult result)
-        {
-            //UpdateFace(result.faceBlendshapes.categories);
-        }
-
         private static float CalculateBlinkValueFromARKit(float arkitScore, float openedThreshold, float closedThreshold)
         {
             if (arkitScore >= openedThreshold)
@@ -1290,6 +1276,7 @@ namespace PMC
 
                 return 1f;
             }
+
             return 0f;
         }
     }

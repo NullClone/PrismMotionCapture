@@ -12,15 +12,7 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [
-        "ENABLE_VRM"
-    ],
-    "versionDefines": [
-        {
-            "name": "com.vrmc.vrm",
-            "expression": "",
-            "define": "ENABLE_VRM"
-        }
-    ],
+    "defineConstraints": [],
+    "versionDefines": [],
     "noEngineReferences": false
 }

@@ -6,6 +6,7 @@ using Mediapipe.Unity.Experimental;
 using OpenCVForUnity.Calib3dModule;
 using OpenCVForUnity.CoreModule;
 using OpenCVForUnity.UnityIntegration;
+using PMC.Utilities;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -46,6 +47,11 @@ namespace PMC
         [SerializeField] private float _filterMinCutoff = 1f;
         [SerializeField] private float _filterBeta = 0.1f;
         [SerializeField] private float _filterDcutoff = 1f;
+        [SerializeField] private bool _enableGlobalPoseFilter = true;
+        [SerializeField] private float _globalPoseFilterFrequency = 120f;
+        [SerializeField] private float _globalPoseFilterMinCutoff = 1f;
+        [SerializeField] private float _globalPoseFilterBeta = 0.1f;
+        [SerializeField] private float _globalPoseFilterDcutoff = 1f;
         [SerializeField, HideInInspector] private BaseOptions.Delegate _delegate;
         [SerializeField, HideInInspector] private RunningMode _runningMode = RunningMode.LIVE_STREAM;
 
@@ -147,12 +153,6 @@ namespace PMC
 
         public event Action<HolisticLandmarkerResult> OnCallback;
 
-        public delegate void CallbackDelegate();
-
-        public CallbackDelegate OnPreCallback;
-
-        public CallbackDelegate OnPostCallback;
-
 
         // Methods
 
@@ -229,8 +229,9 @@ namespace PMC
                 }
             }
 
-            _globalAvatarPositionOneEuroFilter = new OneEuroFilter<Vector3>(_filterFrequency, _filterMinCutoff, _filterBeta, _filterDcutoff);
-            _globalAvatarRotationOneEuroFilter = new OneEuroFilter<Quaternion>(_filterFrequency, _filterMinCutoff, _filterBeta, _filterDcutoff);
+            // Initialize global pose filters with separate parameters
+            _globalAvatarPositionOneEuroFilter = new OneEuroFilter<Vector3>(_globalPoseFilterFrequency, _globalPoseFilterMinCutoff, _globalPoseFilterBeta, _globalPoseFilterDcutoff);
+            _globalAvatarRotationOneEuroFilter = new OneEuroFilter<Quaternion>(_globalPoseFilterFrequency, _globalPoseFilterMinCutoff, _globalPoseFilterBeta, _globalPoseFilterDcutoff);
 
             _initialized = true;
         }
@@ -327,15 +328,11 @@ namespace PMC
             {
                 if (ResultQueue.TryDequeue(out var result))
                 {
-                    OnPreCallback?.Invoke();
-
                     Set(result);
 
                     UpdatePnP(result);
 
                     OnCallback?.Invoke(result);
-
-                    OnPostCallback?.Invoke();
                 }
             }
 
@@ -483,8 +480,11 @@ namespace PMC
             GlobalAvatarPosition = _ARM.GetColumn(3);
             GlobalAvatarRotation = UnityUtils.LookRotation(_ARM.GetColumn(2), _ARM.GetColumn(1));
 
-            GlobalAvatarPosition = _globalAvatarPositionOneEuroFilter.Filter(GlobalAvatarPosition, (float)_stopwatch.Elapsed.TotalSeconds);
-            GlobalAvatarRotation = _globalAvatarRotationOneEuroFilter.Filter(GlobalAvatarRotation, (float)_stopwatch.Elapsed.TotalSeconds);
+            if (_enableGlobalPoseFilter)
+            {
+                GlobalAvatarPosition = _globalAvatarPositionOneEuroFilter.Filter(GlobalAvatarPosition, (float)_stopwatch.Elapsed.TotalSeconds);
+                GlobalAvatarRotation = _globalAvatarRotationOneEuroFilter.Filter(GlobalAvatarRotation, (float)_stopwatch.Elapsed.TotalSeconds);
+            }
 
             var localRotInverse = Quaternion.Inverse(GlobalAvatarRotation);
 
@@ -512,13 +512,9 @@ namespace PMC
             }
             else
             {
-                OnPreCallback?.Invoke();
-
                 Set(holisticLandmarkerResult);
 
                 OnCallback?.Invoke(holisticLandmarkerResult);
-
-                OnPostCallback?.Invoke();
             }
 
 

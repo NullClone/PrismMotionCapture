@@ -20,13 +20,28 @@ namespace PMC.Editor
         private SerializedProperty _minHandLandmarksConfidence;
         private SerializedProperty _outputFaceBlendshapes;
         private SerializedProperty _outputSegmentationMask;
-        private SerializedProperty _preview;
+        private SerializedProperty _landmarkScale;
+        private SerializedProperty _enableKalmanFilter;
+        private SerializedProperty _timeInterval;
+        private SerializedProperty _noise;
+        private SerializedProperty _enableOneEuroFilter;
+        private SerializedProperty _filterFrequency;
+        private SerializedProperty _filterMinCutoff;
+        private SerializedProperty _filterBeta;
+        private SerializedProperty _filterDcutoff;
+        private SerializedProperty _enableGlobalPoseFilter;
+        private SerializedProperty _globalPoseFilterFrequency;
+        private SerializedProperty _globalPoseFilterMinCutoff;
+        private SerializedProperty _globalPoseFilterBeta;
+        private SerializedProperty _globalPoseFilterDcutoff;
 
         private static bool _trackingSettingsFoldout;
+        private static bool _landmarkFilterSettingsFoldout;
+        private static bool _globalPoseFilterSettingsFoldout;
 
         private void OnEnable()
         {
-            m_Script = serializedObject.FindProperty(nameof(m_Script));
+            m_Script = serializedObject.FindProperty("m_Script");
             _imageSource = serializedObject.FindProperty(nameof(_imageSource));
             _imageReadMode = serializedObject.FindProperty(nameof(_imageReadMode));
             _modelAssetPath = serializedObject.FindProperty(nameof(_modelAssetPath));
@@ -39,7 +54,20 @@ namespace PMC.Editor
             _minHandLandmarksConfidence = serializedObject.FindProperty(nameof(_minHandLandmarksConfidence));
             _outputFaceBlendshapes = serializedObject.FindProperty(nameof(_outputFaceBlendshapes));
             _outputSegmentationMask = serializedObject.FindProperty(nameof(_outputSegmentationMask));
-            _preview = serializedObject.FindProperty(nameof(_preview));
+            _landmarkScale = serializedObject.FindProperty(nameof(_landmarkScale));
+            _enableKalmanFilter = serializedObject.FindProperty(nameof(_enableKalmanFilter));
+            _timeInterval = serializedObject.FindProperty(nameof(_timeInterval));
+            _noise = serializedObject.FindProperty(nameof(_noise));
+            _enableOneEuroFilter = serializedObject.FindProperty(nameof(_enableOneEuroFilter));
+            _filterFrequency = serializedObject.FindProperty(nameof(_filterFrequency));
+            _filterMinCutoff = serializedObject.FindProperty(nameof(_filterMinCutoff));
+            _filterBeta = serializedObject.FindProperty(nameof(_filterBeta));
+            _filterDcutoff = serializedObject.FindProperty(nameof(_filterDcutoff));
+            _enableGlobalPoseFilter = serializedObject.FindProperty(nameof(_enableGlobalPoseFilter));
+            _globalPoseFilterFrequency = serializedObject.FindProperty(nameof(_globalPoseFilterFrequency));
+            _globalPoseFilterMinCutoff = serializedObject.FindProperty(nameof(_globalPoseFilterMinCutoff));
+            _globalPoseFilterBeta = serializedObject.FindProperty(nameof(_globalPoseFilterBeta));
+            _globalPoseFilterDcutoff = serializedObject.FindProperty(nameof(_globalPoseFilterDcutoff));
         }
 
         public override void OnInspectorGUI()
@@ -53,38 +81,86 @@ namespace PMC.Editor
 
             EditorGUILayout.Space();
 
+            EditorGUILayout.BeginVertical("box");
             EditorGUILayout.PropertyField(_imageSource);
-
             EditorGUILayout.PropertyField(_imageReadMode);
-            EditorGUILayout.Space();
             EditorGUILayout.PropertyField(_modelAssetPath);
+            EditorGUILayout.PropertyField(_landmarkScale);
+            EditorGUILayout.EndVertical();
+
             EditorGUILayout.Space();
 
-            var trackingSettingsFoldout = EditorGUILayout.Foldout(_trackingSettingsFoldout, "Tracking Settings", true);
-
-            if (trackingSettingsFoldout)
+            _trackingSettingsFoldout = EditorGUILayout.Foldout(_trackingSettingsFoldout, "Tracking Confidence", true);
+            if (_trackingSettingsFoldout)
             {
+                EditorGUILayout.BeginVertical("box");
                 using (new EditorGUI.IndentLevelScope())
                 {
-                    EditorGUILayout.PropertyField(_minFaceDetectionConfidence, new GUIContent("Face Detection Confidence"));
-                    EditorGUILayout.PropertyField(_minFaceSuppressionThreshold, new GUIContent("Face Suppression Threshold"));
-                    EditorGUILayout.PropertyField(_minFaceLandmarksConfidence, new GUIContent("Face Landmarks Confidence"));
-                    EditorGUILayout.PropertyField(_minPoseDetectionConfidence, new GUIContent("Pose Detection Confidence"));
-                    EditorGUILayout.PropertyField(_minPoseSuppressionThreshold, new GUIContent("Pose Suppression Threshold"));
-                    EditorGUILayout.PropertyField(_minPoseLandmarksConfidence, new GUIContent("Pose Landmarks Confidence"));
-                    EditorGUILayout.PropertyField(_minHandLandmarksConfidence, new GUIContent("Hand Landmarks Confidence"));
+                    EditorGUILayout.PropertyField(_minFaceDetectionConfidence, new GUIContent("Face Detection"));
+                    EditorGUILayout.PropertyField(_minFaceSuppressionThreshold, new GUIContent("Face Suppression"));
+                    EditorGUILayout.PropertyField(_minFaceLandmarksConfidence, new GUIContent("Face Landmarks"));
+                    EditorGUILayout.Space();
+                    EditorGUILayout.PropertyField(_minPoseDetectionConfidence, new GUIContent("Pose Detection"));
+                    EditorGUILayout.PropertyField(_minPoseSuppressionThreshold, new GUIContent("Pose Suppression"));
+                    EditorGUILayout.PropertyField(_minPoseLandmarksConfidence, new GUIContent("Pose Landmarks"));
+                    EditorGUILayout.Space();
+                    EditorGUILayout.PropertyField(_minHandLandmarksConfidence, new GUIContent("Hand Landmarks"));
                     EditorGUILayout.Space();
                     EditorGUILayout.PropertyField(_outputFaceBlendshapes, new GUIContent("Enable Face Blendshapes"));
                     EditorGUILayout.PropertyField(_outputSegmentationMask, new GUIContent("Enable Segmentation Mask"));
-                    EditorGUILayout.Space();
                 }
+                EditorGUILayout.EndVertical();
             }
-
-            _trackingSettingsFoldout = trackingSettingsFoldout;
 
             EditorGUILayout.Space();
 
-            EditorGUILayout.PropertyField(_preview);
+            _landmarkFilterSettingsFoldout = EditorGUILayout.Foldout(_landmarkFilterSettingsFoldout, "Landmark Filter Settings", true);
+            if (_landmarkFilterSettingsFoldout)
+            {
+                EditorGUILayout.BeginVertical("box");
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    EditorGUILayout.PropertyField(_enableKalmanFilter);
+
+                    using (new EditorGUI.DisabledGroupScope(!_enableKalmanFilter.boolValue))
+                    {
+                        EditorGUILayout.PropertyField(_timeInterval);
+                        EditorGUILayout.PropertyField(_noise);
+                    }
+
+                    EditorGUILayout.Space();
+                    EditorGUILayout.PropertyField(_enableOneEuroFilter);
+
+                    using (new EditorGUI.DisabledGroupScope(!_enableOneEuroFilter.boolValue))
+                    {
+                        EditorGUILayout.PropertyField(_filterFrequency);
+                        EditorGUILayout.PropertyField(_filterMinCutoff);
+                        EditorGUILayout.PropertyField(_filterBeta);
+                        EditorGUILayout.PropertyField(_filterDcutoff);
+                    }
+                }
+                EditorGUILayout.EndVertical();
+            }
+
+            EditorGUILayout.Space();
+
+            _globalPoseFilterSettingsFoldout = EditorGUILayout.Foldout(_globalPoseFilterSettingsFoldout, "Global Pose Filter Settings", true);
+            if (_globalPoseFilterSettingsFoldout)
+            {
+                EditorGUILayout.BeginVertical("box");
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    EditorGUILayout.PropertyField(_enableGlobalPoseFilter, new GUIContent("Enable Global Pose Filter"));
+                    using (new EditorGUI.DisabledGroupScope(!_enableGlobalPoseFilter.boolValue))
+                    {
+                        EditorGUILayout.PropertyField(_globalPoseFilterFrequency);
+                        EditorGUILayout.PropertyField(_globalPoseFilterMinCutoff);
+                        EditorGUILayout.PropertyField(_globalPoseFilterBeta);
+                        EditorGUILayout.PropertyField(_globalPoseFilterDcutoff);
+                    }
+                }
+                EditorGUILayout.EndVertical();
+            }
 
             EditorGUILayout.Space();
 
