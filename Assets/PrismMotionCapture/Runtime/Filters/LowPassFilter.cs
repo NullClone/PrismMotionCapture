@@ -4,18 +4,29 @@ namespace PMC
 {
     public class LowPassFilter
     {
-        public float Alpha
-        {
-            get { return a; }
-            set { a = Mathf.Clamp01(value); }
-        }
+        // Fields
 
         private float a;
         private float lastFilteredValue;
 
+
+        // Properties
+
+        public float Alpha
+        {
+            get { return a; }
+            set
+            {
+                a = Mathf.Clamp01(value);
+            }
+        }
+
         public float LastRawValue { get; private set; }
 
         public bool IsInitialized { get; private set; }
+
+
+        // Methods
 
         public LowPassFilter(float alpha, float initval = 0f)
         {
@@ -23,6 +34,7 @@ namespace PMC
             Alpha = alpha;
             IsInitialized = false;
         }
+
 
         public float Filter(float value)
         {
@@ -35,6 +47,7 @@ namespace PMC
             else
             {
                 result = value;
+
                 IsInitialized = true;
             }
 

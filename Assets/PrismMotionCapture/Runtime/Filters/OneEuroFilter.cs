@@ -5,89 +5,56 @@ namespace PMC
 {
     public class OneEuroFilter
     {
+        // Fields
+
         private float freq;
         private float minCutoff;
         private float beta;
         private float dCutoff;
-
-        private LowPassFilter x;
-        private LowPassFilter dx;
         private float lasttime;
+
+        private readonly LowPassFilter x;
+        private readonly LowPassFilter dx;
+
+
+        // Properties
 
         public float CurrValue { get; protected set; }
 
         public float PrevValue { get; protected set; }
 
-        private float Alpha(float cutoff)
-        {
-            float te = 1f / freq;
-            float tau = 1f / (2f * Mathf.PI * cutoff);
 
-            return 1f / (1f + (tau / te));
-        }
-
-        private void SetFrequency(float f)
-        {
-            if (f <= 0f)
-            {
-                Debug.LogError("freq should be > 0");
-
-                return;
-            }
-
-            freq = f;
-        }
-
-        private void SetMinCutoff(float mc)
-        {
-            if (mc <= 0f)
-            {
-                Debug.LogError("mincutoff should be > 0");
-
-                return;
-            }
-
-            minCutoff = mc;
-        }
-
-        private void SetBeta(float b)
-        {
-            beta = b;
-        }
-
-        private void SetDerivateCutoff(float dc)
-        {
-            if (dc <= 0f)
-            {
-                Debug.LogError("dcutoff should be > 0");
-
-                return;
-            }
-
-            dCutoff = dc;
-        }
+        // Methods
 
         public OneEuroFilter(float freq, float minCutoff = 1f, float beta = 0f, float dCutoff = 1f)
         {
-            SetFrequency(freq);
-            SetMinCutoff(minCutoff);
-            SetBeta(beta);
-            SetDerivateCutoff(dCutoff);
+            this.freq = freq;
+            this.minCutoff = minCutoff;
+            this.beta = beta;
+            this.dCutoff = dCutoff;
 
             x = new LowPassFilter(Alpha(this.minCutoff));
             dx = new LowPassFilter(Alpha(this.dCutoff));
             lasttime = -1f;
-
             CurrValue = 0f;
             PrevValue = CurrValue;
         }
 
+
+        private float Alpha(float cutoff)
+        {
+            var te = 1f / freq;
+            var tau = 1f / (2f * Mathf.PI * cutoff);
+
+            return 1f / (1f + (tau / te));
+        }
+
         public void UpdateParams(float freq, float minCutoff = 1f, float beta = 0f, float dCutoff = 1f)
         {
-            SetFrequency(freq);
-            SetMinCutoff(minCutoff);
-            SetBeta(beta);
-            SetDerivateCutoff(dCutoff);
+            this.freq = freq;
+            this.minCutoff = minCutoff;
+            this.beta = beta;
+            this.dCutoff = dCutoff;
 
             x.Alpha = Alpha(this.minCutoff);
             dx.Alpha = Alpha(this.dCutoff);
@@ -117,8 +84,13 @@ namespace PMC
 
     public class OneEuroFilter<T> where T : struct
     {
+        // Fields
+
         private readonly Func<T, float, T> filterDelegate;
         private readonly OneEuroFilter[] oneEuroFilters;
+
+
+        // Properties
 
         public float Freq { get; protected set; }
 
@@ -131,6 +103,9 @@ namespace PMC
         public T CurrValue { get; protected set; }
 
         public T PrevValue { get; protected set; }
+
+
+        // Methods
 
         public OneEuroFilter(float freq, float minCutoff = 1f, float beta = 0f, float dCutoff = 1f)
         {
@@ -176,6 +151,7 @@ namespace PMC
                 oneEuroFilters[i] = new OneEuroFilter(Freq, MinCutoff, Beta, DCutoff);
             }
         }
+
 
         public void UpdateParams(float freq, float minCutoff = 1f, float beta = 0f, float dCutoff = 1f)
         {
