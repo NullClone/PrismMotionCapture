@@ -95,18 +95,6 @@ namespace PMC
             }
         }
 
-        private void Set(IReadOnlyList<Mediapipe.Tasks.Components.Containers.Landmark> landmarks)
-        {
-            if (landmarks == null || landmarks.Count == 0) return;
-
-            _positions ??= new Vector3[landmarks.Count];
-
-            for (int i = 0; i < _positions.Length; i++)
-            {
-                _positions[i] = new Vector3(landmarks[i].x, landmarks[i].y, VisualizeZ ? landmarks[i].z : 0f);
-            }
-        }
-
         private bool IsVisible(int index, BodyParts mask)
         {
             if (mask.HasFlag(BodyParts.All))
@@ -167,7 +155,7 @@ namespace PMC
     {
         None = 0,
         Face = 1,
-        // Torso = 2,
+        //Torso = 2,
         LeftArm = 4,
         LeftHand = 8,
         RightArm = 16,
