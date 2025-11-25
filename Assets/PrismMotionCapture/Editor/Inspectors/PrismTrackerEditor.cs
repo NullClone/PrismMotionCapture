@@ -7,7 +7,6 @@ namespace PMC.Editor
     [CustomEditor(typeof(PrismTracker))]
     sealed class PrismTrackerEditor : UnityEditor.Editor
     {
-        private SerializedProperty m_Script;
         private SerializedProperty ImageSource;
         private SerializedProperty ModelAsset;
         private SerializedProperty ImageReadMode;
@@ -41,7 +40,6 @@ namespace PMC.Editor
 
         private void OnEnable()
         {
-            m_Script = serializedObject.FindProperty("m_Script");
             ImageSource = serializedObject.FindProperty(nameof(ImageSource));
             ModelAsset = serializedObject.FindProperty(nameof(ModelAsset));
             ImageReadMode = serializedObject.FindProperty(nameof(ImageReadMode));
@@ -74,12 +72,6 @@ namespace PMC.Editor
         {
             serializedObject.Update();
 
-            using (new EditorGUI.DisabledScope(true))
-            {
-                EditorGUILayout.PropertyField(m_Script, true);
-            }
-
-            EditorGUILayout.Space();
             EditorGUILayout.BeginVertical("box");
             EditorGUILayout.PropertyField(ImageSource);
             EditorGUILayout.PropertyField(ModelAsset);

@@ -110,6 +110,12 @@ namespace PMC
 
         // Properties
 
+        public Vector3 GlobalAvatarPosition { get; private set; } = Vector3.zero;
+
+        public Quaternion GlobalAvatarRotation { get; private set; } = Quaternion.identity;
+
+        public int MediaPipeFPS { get; private set; }
+
         public bool ActiveFaceLandmark { get; private set; }
 
         public bool ActivePoseLandmark { get; private set; }
@@ -125,7 +131,6 @@ namespace PMC
         public bool ActiveRightHandWorldLandmark { get; private set; }
 
         public bool ActiveFaceBlendShapes { get; private set; }
-
 
         public Landmark[] FaceLandmarks { get; private set; } = new Landmark[FaceLandmarkCount].Select(x => new Landmark()).ToArray();
 
@@ -144,13 +149,6 @@ namespace PMC
         public float[] FaceBlendShapes { get; private set; } = new float[FaceBlendShapeCount];
 
         public Vector3[] LocalAvatarSpacePoints { get; private set; } = new Vector3[PoseLandmarkCount];
-
-
-        public Vector3 GlobalAvatarPosition { get; private set; } = Vector3.zero;
-
-        public Quaternion GlobalAvatarRotation { get; private set; } = Quaternion.identity;
-
-        public int MediaPipeFPS { get; private set; }
 
 
         // Events
