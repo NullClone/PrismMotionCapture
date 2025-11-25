@@ -170,7 +170,7 @@ namespace PMC.Editor
 
             EditorGUILayout.Space();
 
-            UI.DrawFoot();
+            EditorGUILayout.LabelField($"{AssetInfo.AssetName} (v{AssetInfo.AssetVersion})", EditorStyles.centeredGreyMiniLabel);
 
             serializedObject.ApplyModifiedProperties();
         }
