@@ -105,6 +105,7 @@ namespace PMC
         public const int PoseLandmarkCount = 33;
         public const int HandLandmarkCount = 21;
         public const int FaceLandmarkCount = 478;
+        public const int FaceBlendShapeCount = 52;
 
 
         // Properties
@@ -140,7 +141,7 @@ namespace PMC
 
         public Landmark[] RightHandWorldLandmarks { get; private set; } = new Landmark[HandLandmarkCount].Select(x => new Landmark()).ToArray();
 
-        public List<Mediapipe.Tasks.Components.Containers.Category> Categories { get; private set; }
+        public float[] FaceBlendShapes { get; private set; } = new float[FaceBlendShapeCount];
 
         public Vector3[] LocalAvatarSpacePoints { get; private set; } = new Vector3[PoseLandmarkCount];
 
@@ -395,7 +396,10 @@ namespace PMC
 
             if (ActiveFaceBlendShapes)
             {
-                Categories = holisticLandmarkerResult.faceBlendshapes.categories;
+                for (int i = 0; i < FaceBlendShapes.Length; i++)
+                {
+                    FaceBlendShapes[i] = holisticLandmarkerResult.faceBlendshapes.categories[i].score;
+                }
             }
 
             foreach (var landmark in PoseWorldLandmarks)

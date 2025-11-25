@@ -970,8 +970,8 @@ namespace PMC
             }
             else
             {
-                var targetLeft = CalculateBlinkValueFromARKit(_tracker.Categories[(int)FaceBlendShapes.EyeBlinkLeft].score, _eyeOpenedThreshold, _eyeClosedThreshold);
-                var targetRight = CalculateBlinkValueFromARKit(_tracker.Categories[(int)FaceBlendShapes.EyeBlinkRight].score, _eyeOpenedThreshold, _eyeClosedThreshold);
+                var targetLeft = CalculateBlinkValueFromARKit(_tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeBlinkLeft], _eyeOpenedThreshold, _eyeClosedThreshold);
+                var targetRight = CalculateBlinkValueFromARKit(_tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeBlinkRight], _eyeOpenedThreshold, _eyeClosedThreshold);
 
                 var t = _blinkInterpolate.Interpolate();
                 var smoothedLeft = Mathf.Lerp(_lastBlinkLeft, _currentBlinkLeft, t);
@@ -1011,10 +1011,10 @@ namespace PMC
         {
             if (!_gazeTracking || !_tracker.ActiveFaceBlendShapes) return;
 
-            var targetLookUp = (_tracker.Categories[(int)FaceBlendShapes.EyeLookUpLeft].score + _tracker.Categories[(int)FaceBlendShapes.EyeLookUpRight].score) / 2f;
-            var targetLookDown = (_tracker.Categories[(int)FaceBlendShapes.EyeLookDownLeft].score + _tracker.Categories[(int)FaceBlendShapes.EyeLookDownRight].score) / 2f;
-            var targetLookLeft = (_tracker.Categories[(int)FaceBlendShapes.EyeLookInLeft].score + _tracker.Categories[(int)FaceBlendShapes.EyeLookOutRight].score) / 2f;
-            var targetLookRight = (_tracker.Categories[(int)FaceBlendShapes.EyeLookOutLeft].score + _tracker.Categories[(int)FaceBlendShapes.EyeLookInRight].score) / 2f;
+            var targetLookUp = (_tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookUpLeft] + _tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookUpRight]) / 2f;
+            var targetLookDown = (_tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookDownLeft] + _tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookDownRight]) / 2f;
+            var targetLookLeft = (_tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookInLeft] + _tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookOutRight]) / 2f;
+            var targetLookRight = (_tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookOutLeft] + _tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookInRight]) / 2f;
 
             var t = _gazeInterpolate.Interpolate();
 
@@ -1050,7 +1050,7 @@ namespace PMC
 
             var t = _mouthInterpolate.Interpolate();
 
-            var mouthOpen = _tracker.Categories[(int)FaceBlendShapes.JawOpen].score * _mouthOpenSensitivity;
+            var mouthOpen = _tracker.FaceBlendShapes[(int)FaceBlendShapes.JawOpen] * _mouthOpenSensitivity;
             var au = Mathf.Lerp(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Aa), mouthOpen, 1f - _mouthSmoothing);
 
             _vrm.Runtime.Expression.SetWeight(ExpressionKey.Aa, au);
@@ -1059,10 +1059,10 @@ namespace PMC
             _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ee, 0);
             _vrm.Runtime.Expression.SetWeight(ExpressionKey.Oh, 0);
 
-            var smile = (_tracker.Categories[(int)FaceBlendShapes.MouthSmileLeft].score + _tracker.Categories[(int)FaceBlendShapes.MouthSmileRight].score) / 2f * _mouthShapeSensitivity;
-            var frown = (_tracker.Categories[(int)FaceBlendShapes.MouthFrownLeft].score + _tracker.Categories[(int)FaceBlendShapes.MouthFrownRight].score) / 2f * _mouthShapeSensitivity;
-            var pucker = _tracker.Categories[(int)FaceBlendShapes.MouthPucker].score * _mouthShapeSensitivity;
-            var funnel = _tracker.Categories[(int)FaceBlendShapes.MouthFunnel].score * _mouthShapeSensitivity;
+            var smile = (_tracker.FaceBlendShapes[(int)FaceBlendShapes.MouthSmileLeft] + _tracker.FaceBlendShapes[(int)FaceBlendShapes.MouthSmileRight]) / 2f * _mouthShapeSensitivity;
+            var frown = (_tracker.FaceBlendShapes[(int)FaceBlendShapes.MouthFrownLeft] + _tracker.FaceBlendShapes[(int)FaceBlendShapes.MouthFrownRight]) / 2f * _mouthShapeSensitivity;
+            var pucker = _tracker.FaceBlendShapes[(int)FaceBlendShapes.MouthPucker] * _mouthShapeSensitivity;
+            var funnel = _tracker.FaceBlendShapes[(int)FaceBlendShapes.MouthFunnel] * _mouthShapeSensitivity;
             var shapeTotal = smile + frown + pucker + funnel;
 
             if (shapeTotal > 1.0f)
