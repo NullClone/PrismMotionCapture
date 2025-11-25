@@ -42,14 +42,7 @@ Unityで高精度なモーションキャプチャーを実現することがで
 
 バージョン<b>0.16.3</b>以上をサポートしています。（常に最新のバージョンを使用することをおすすめします）<br>
 
-- <b>方法1 (推奨)</b>: GitHubの[リリースページ](https://github.com/homuler/MediaPipeUnityPlugin/releases)から、最新の.unitypackageファイルをダウンロードし、Unityにインポートします。<br>
-
-- <b>方法2</b>
-  - パッケージマネージャーで以下のURLを入力します。詳しくは上のインストール方法を参照してください。
-   ```bash
-   https://github.com/homuler/MediaPipeUnityPlugin.git?path=/Packages/com.github.homuler.mediapipe
-   ```  
-  - この方法の場合、ネイティブライブラリが含まれていないため、別途用意する必要がります。自分でビルドするか、このリポジトリのPluginsフォルダにあるDllをコピーします。
+GitHubの[リリースページ](https://github.com/homuler/MediaPipeUnityPlugin/releases)から、最新の.unitypackageファイルをダウンロードし、Unityにインポートします。<br>
 
 ## 使い方
 
