@@ -1,4 +1,5 @@
-using System;
+#if UNITY_EDITOR
+
 using System.Collections.Generic;
 using UnityEngine;
 using Color = UnityEngine.Color;
@@ -10,21 +11,18 @@ namespace PMC
     {
         // Fields
 
-        [SerializeField] private PrismTracker _tracker;
         [SerializeField] private float _landmarkRadius = 0.01f;
-        [SerializeField] private Color _leftLandmarkColor = Color.green;
+        [SerializeField] private Color _leftLandmarkColor = new(1f, 0.5f, 0f, 1f);
         [SerializeField] private Color _rightLandmarkColor = Color.cyan;
-        [SerializeField] private Color _centerLandmarkColor = Color.white;
-        [SerializeField] private Color _connectionColor = Color.red;
+        [SerializeField] private Color _connectionColor = Color.white;
+        [SerializeField] private Vector3 LandmarkPosition = Vector3.zero;
 
-        private Vector3 _baseTrackingPosition;
+        private PrismTracker _tracker;
 
         private Vector3[] _positions;
 
         private static readonly HashSet<int> _LeftLandmarks = new() { 1, 2, 3, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31 };
-
         private static readonly HashSet<int> _RightLandmarks = new() { 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32 };
-
         private static readonly List<(int, int)> _Connections = new() {
             // Left Eye
             (0, 1), (1, 2), (2, 3), (3, 7),
@@ -49,20 +47,24 @@ namespace PMC
         };
 
 
-        // Properties
-
-        public BodyParts Mask { get; set; } = BodyParts.All;
-
-        public Vector3 LandmarkPosition = Vector3.zero;
-
-        public bool VisualizeZ { get; set; } = true;
-
-
         // Methods
+
+        private void Reset()
+        {
+            Awake();
+        }
+
+        private void Awake()
+        {
+            if (_tracker == null)
+            {
+                _tracker = gameObject.GetComponent<PrismTracker>();
+            }
+        }
 
         private void OnDrawGizmos()
         {
-            if (!Application.isPlaying || !enabled) return;
+            if (!Application.isPlaying || _tracker == null || !enabled) return;
 
             _positions = _tracker.LocalAvatarSpacePoints;
 
@@ -72,95 +74,25 @@ namespace PMC
 
             foreach (var conn in _Connections)
             {
-                if (IsVisible(conn.Item1, Mask) && IsVisible(conn.Item2, Mask))
-                {
-                    if (conn.Item1 >= _positions.Length || conn.Item2 >= _positions.Length) continue;
-
-                    Gizmos.DrawLine(_positions[conn.Item1] + LandmarkPosition, _positions[conn.Item2] + LandmarkPosition);
-                }
+                Gizmos.DrawLine(_positions[conn.Item1] + LandmarkPosition, _positions[conn.Item2] + LandmarkPosition);
             }
 
             for (int i = 0; i < _positions.Length; i++)
             {
-                if (IsVisible(i, Mask))
+                if (_LeftLandmarks.Contains(i))
                 {
-                    Gizmos.color = GetLandmarkColor(i);
-                    Gizmos.DrawSphere(_positions[i] + LandmarkPosition, _landmarkRadius);
+                    Gizmos.color = _leftLandmarkColor;
                 }
-            }
 
-            if (_tracker.GlobalAvatarPosition != Vector3.zero && _baseTrackingPosition == Vector3.zero)
-            {
-                _baseTrackingPosition = -_tracker.GlobalAvatarPosition;
+                if (_RightLandmarks.Contains(i))
+                {
+                    Gizmos.color = _rightLandmarkColor;
+                }
+
+                Gizmos.DrawSphere(_positions[i] + LandmarkPosition, _landmarkRadius);
             }
         }
-
-        private bool IsVisible(int index, BodyParts mask)
-        {
-            if (mask.HasFlag(BodyParts.All))
-            {
-                return true;
-            }
-            if (mask == BodyParts.None)
-            {
-                return false;
-            }
-
-            if (index >= 0 && index <= 10) // Face
-            {
-                return mask.HasFlag(BodyParts.Face);
-            }
-            if (index == 13) // Left Elbow
-            {
-                return mask.HasFlag(BodyParts.LeftArm);
-            }
-            if (index == 15 || index == 17 || index == 19 || index == 21) // Left Hand
-            {
-                return mask.HasFlag(BodyParts.LeftHand);
-            }
-            if (index == 14) // Right Elbow
-            {
-                return mask.HasFlag(BodyParts.RightArm);
-            }
-            if (index == 16 || index == 18 || index == 20 || index == 22) // Right Hand
-            {
-                return mask.HasFlag(BodyParts.RightHand);
-            }
-            if (index >= 25 && index <= 32) // Lower Body
-            {
-                return mask.HasFlag(BodyParts.LowerBody);
-            }
-
-            return true;
-        }
-
-        private Color GetLandmarkColor(int index)
-        {
-            if (_LeftLandmarks.Contains(index))
-            {
-                return _leftLandmarkColor;
-            }
-
-            if (_RightLandmarks.Contains(index))
-            {
-                return _rightLandmarkColor;
-            }
-
-            return _centerLandmarkColor;
-        }
-    }
-
-    [Flags]
-    public enum BodyParts : short
-    {
-        None = 0,
-        Face = 1,
-        //Torso = 2,
-        LeftArm = 4,
-        LeftHand = 8,
-        RightArm = 16,
-        RightHand = 32,
-        LowerBody = 64,
-        All = 127,
     }
 }
+
+#endif

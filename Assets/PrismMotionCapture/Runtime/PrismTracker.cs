@@ -9,9 +9,8 @@ using OpenCVForUnity.UnityIntegration;
 using PMC.Utilities;
 using System;
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
+using System.Linq;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -25,20 +24,21 @@ namespace PMC
     {
         // Fields
 
-        [SerializeField] private ImageSource _imageSource;
-        [SerializeField] private ImageReadMode _imageReadMode = ImageReadMode.CPUAsync;
-        [SerializeField] private string _modelAssetPath = "holistic_landmarker.bytes";
-        [SerializeField, Range(0f, 1f)] private float _minFaceDetectionConfidence = 0.5f;
-        [SerializeField, Range(0f, 1f)] private float _minFaceSuppressionThreshold = 0.5f;
-        [SerializeField, Range(0f, 1f)] private float _minFaceLandmarksConfidence = 0.5f;
-        [SerializeField, Range(0f, 1f)] private float _minPoseDetectionConfidence = 0.5f;
-        [SerializeField, Range(0f, 1f)] private float _minPoseSuppressionThreshold = 0.5f;
-        [SerializeField, Range(0f, 1f)] private float _minPoseLandmarksConfidence = 0.5f;
-        [SerializeField, Range(0f, 1f)] private float _minHandLandmarksConfidence = 0.5f;
-        [SerializeField] private bool _outputFaceBlendshapes = true;
-        [SerializeField] private bool _outputSegmentationMask = true;
-        [SerializeField] private bool _useMainThread = true;
-        [SerializeField] private Vector3 _landmarkScale = new(1f, 1f, 1f);
+        public ImageSource ImageSource;
+        private BaseOptions.Delegate _delegate;
+        public TextAsset ModelAsset;
+        public ImageReadMode ImageReadMode = ImageReadMode.CPUAsync;
+
+        [Range(0f, 1f)] public float MinFaceDetectionConfidence = 0.5f;
+        [Range(0f, 1f)] public float MinFaceSuppressionThreshold = 0.5f;
+        [Range(0f, 1f)] public float MinFaceLandmarksConfidence = 0.5f;
+        [Range(0f, 1f)] public float MinPoseDetectionConfidence = 0.5f;
+        [Range(0f, 1f)] public float MinPoseSuppressionThreshold = 0.5f;
+        [Range(0f, 1f)] public float MinPoseLandmarksConfidence = 0.5f;
+        [Range(0f, 1f)] public float MinHandLandmarksConfidence = 0.5f;
+        public bool OutputFaceBlendshapes = true;
+        public bool OutputSegmentationMask = false;
+
         [SerializeField] private bool _enableKalmanFilter = true;
         [SerializeField] private float _timeInterval = 0.45f;
         [SerializeField] private float _noise = 0.4f;
@@ -52,16 +52,14 @@ namespace PMC
         [SerializeField] private float _globalPoseFilterMinCutoff = 1f;
         [SerializeField] private float _globalPoseFilterBeta = 0.1f;
         [SerializeField] private float _globalPoseFilterDcutoff = 1f;
-        [SerializeField, HideInInspector] private BaseOptions.Delegate _delegate;
-        [SerializeField, HideInInspector] private RunningMode _runningMode = RunningMode.LIVE_STREAM;
+
+        //public Vector3 LandmarkScale = Vector3.one;
 
         private HolisticLandmarker _holisticLandmarker;
         private TextureFramePool _textureFramePool;
         private Stopwatch _stopwatch;
 
-        private int _resultCallbackCount = 0;
-        private float _fpsTimer = 0f;
-        private bool _initialized = false;
+        private double _fx, _fy, _cx, _cy;
 
         private Mat _camMatrix;
         private MatOfDouble _distCoeffs;
@@ -76,20 +74,21 @@ namespace PMC
         private Matrix4x4 _invertYM;
         private Matrix4x4 _invertZM;
         private Matrix4x4 _transformationM;
-        private Matrix4x4 _ARM;
 
-        private double _fx, _fy, _cx, _cy;
-        private double[] _tvecArr;
+        private bool _initialized = false;
 
-        private readonly KalmanFilter[] _kalmanFilters = new KalmanFilter[PoseLandmarkCount];
+        [HideInInspector] private int _resultCallbackCount = 0;
+        [HideInInspector] private float _fpsTimer = 0f;
+
         private OneEuroFilter<Vector3> _globalAvatarPositionOneEuroFilter;
         private OneEuroFilter<Quaternion> _globalAvatarRotationOneEuroFilter;
+
+
+        private readonly KalmanFilter[] _kalmanFilters = new KalmanFilter[PoseLandmarkCount];
         private readonly OneEuroFilter<Vector3>[] _oneEuroFilters = new OneEuroFilter<Vector3>[PoseLandmarkCount];
 
         private readonly List<Point3> _objectPointsList = new();
         private readonly List<Point> _imagePointsList = new();
-
-        private readonly Vector3[] _adjustedCameraSpacePoints = new Vector3[PoseLandmarkCount];
 
         private readonly int[] _pnpLandmarkIndices = new int[]
         {
@@ -101,29 +100,14 @@ namespace PMC
         };
 
 
+        public const string ModelAssetPath = "holistic_landmarker.bytes";
+
         public const int PoseLandmarkCount = 33;
         public const int HandLandmarkCount = 21;
         public const int FaceLandmarkCount = 478;
 
 
         // Properties
-
-        public Landmark[] FaceLandmarks { get; private set; } = new Landmark[FaceLandmarkCount];
-
-        public Landmark[] PoseLandmarks { get; private set; } = new Landmark[PoseLandmarkCount];
-
-        public Landmark[] PoseWorldLandmarks { get; private set; } = new Landmark[PoseLandmarkCount];
-
-        public Landmark[] LeftHandLandmarks { get; private set; } = new Landmark[HandLandmarkCount];
-
-        public Landmark[] LeftHandWorldLandmarks { get; private set; } = new Landmark[HandLandmarkCount];
-
-        public Landmark[] RightHandLandmarks { get; private set; } = new Landmark[HandLandmarkCount];
-
-        public Landmark[] RightHandWorldLandmarks { get; private set; } = new Landmark[HandLandmarkCount];
-
-        public Vector3[] LocalAvatarSpacePoints { get; private set; } = new Vector3[PoseLandmarkCount];
-
 
         public bool ActiveFaceLandmark { get; private set; }
 
@@ -139,12 +123,31 @@ namespace PMC
 
         public bool ActiveRightHandWorldLandmark { get; private set; }
 
+        public bool ActiveFaceBlendShapes { get; private set; }
+
+
+        public Landmark[] FaceLandmarks { get; private set; } = new Landmark[FaceLandmarkCount].Select(x => new Landmark()).ToArray();
+
+        public Landmark[] PoseLandmarks { get; private set; } = new Landmark[PoseLandmarkCount].Select(x => new Landmark()).ToArray();
+
+        public Landmark[] PoseWorldLandmarks { get; private set; } = new Landmark[PoseLandmarkCount].Select(x => new Landmark()).ToArray();
+
+        public Landmark[] LeftHandLandmarks { get; private set; } = new Landmark[HandLandmarkCount].Select(x => new Landmark()).ToArray();
+
+        public Landmark[] LeftHandWorldLandmarks { get; private set; } = new Landmark[HandLandmarkCount].Select(x => new Landmark()).ToArray();
+
+        public Landmark[] RightHandLandmarks { get; private set; } = new Landmark[HandLandmarkCount].Select(x => new Landmark()).ToArray();
+
+        public Landmark[] RightHandWorldLandmarks { get; private set; } = new Landmark[HandLandmarkCount].Select(x => new Landmark()).ToArray();
+
+        public List<Mediapipe.Tasks.Components.Containers.Category> Categories { get; private set; }
+
+        public Vector3[] LocalAvatarSpacePoints { get; private set; } = new Vector3[PoseLandmarkCount];
+
 
         public Vector3 GlobalAvatarPosition { get; private set; } = Vector3.zero;
 
         public Quaternion GlobalAvatarRotation { get; private set; } = Quaternion.identity;
-
-        public ConcurrentQueue<HolisticLandmarkerResult> ResultQueue { get; private set; } = new();
 
         public int MediaPipeFPS { get; private set; }
 
@@ -158,23 +161,7 @@ namespace PMC
 
         private void Awake()
         {
-            if (_imageSource == null || !enabled) return;
-
-            ResourceUtil.EnableCustomResolver();
-
-            var assetPath = Path.Combine(Application.streamingAssetsPath, _modelAssetPath);
-            var assetName = Path.GetFileName(assetPath);
-
-            if (File.Exists(assetPath))
-            {
-                ResourceUtil.SetAssetPath(assetName, assetPath);
-            }
-            else
-            {
-                Debug.LogError($"Model asset not found at path: {assetPath}");
-
-                return;
-            }
+            if (ImageSource == null || !enabled) return;
 
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
             _delegate = BaseOptions.Delegate.CPU;
@@ -182,40 +169,49 @@ namespace PMC
             _delegate = BaseOptions.Delegate.GPU;
 #endif
 
-            var baseOptions = new BaseOptions(_delegate, assetName);
+            var baseOptions = new BaseOptions(_delegate, ModelAssetPath, ModelAsset.bytes);
 
             var options = new HolisticLandmarkerOptions(
                 baseOptions,
-                _runningMode,
-                _minFaceDetectionConfidence,
-                _minFaceSuppressionThreshold,
-                _minFaceLandmarksConfidence,
-                _minPoseDetectionConfidence,
-                _minPoseSuppressionThreshold,
-                _minPoseLandmarksConfidence,
-                _minHandLandmarksConfidence,
-                _outputFaceBlendshapes,
-                _outputSegmentationMask,
-                resultCallback: (_runningMode == RunningMode.LIVE_STREAM) ? ResultCallback : null);
+                RunningMode.LIVE_STREAM,
+                MinFaceDetectionConfidence,
+                MinFaceSuppressionThreshold,
+                MinFaceLandmarksConfidence,
+                MinPoseDetectionConfidence,
+                MinPoseSuppressionThreshold,
+                MinPoseLandmarksConfidence,
+                MinHandLandmarksConfidence,
+                OutputFaceBlendshapes,
+                OutputSegmentationMask,
+                resultCallback: ResultCallback);
 
             _holisticLandmarker = HolisticLandmarker.CreateFromOptions(options, GpuManager.GpuResources);
 
-            _textureFramePool = new TextureFramePool((int)_imageSource.Resolution.x, (int)_imageSource.Resolution.y, TextureFormat.RGBA32, 10);
+            _textureFramePool = new TextureFramePool((int)ImageSource.Resolution.x, (int)ImageSource.Resolution.y, TextureFormat.RGBA32, 10);
 
-            InitializeLandmark(FaceLandmarks);
-            InitializeLandmark(PoseLandmarks);
-            InitializeLandmark(PoseWorldLandmarks);
-            InitializeLandmark(LeftHandLandmarks);
-            InitializeLandmark(LeftHandWorldLandmarks);
-            InitializeLandmark(RightHandLandmarks);
-            InitializeLandmark(RightHandWorldLandmarks);
+            _stopwatch = Stopwatch.StartNew();
+
+
+            foreach (var landmark in PoseWorldLandmarks)
+            {
+                if (_enableKalmanFilter)
+                {
+                    landmark.KalmanFilter = new KalmanFilter();
+                    landmark.KalmanFilter.SetParameter(_timeInterval, _noise);
+                    landmark.KalmanFilter.Predict();
+                }
+
+                if (_enableOneEuroFilter)
+                {
+                    landmark.OneEuroFilter = new OneEuroFilter<Vector3>(_filterFrequency, _filterMinCutoff, _filterBeta, _filterDcutoff);
+                }
+            }
 
             if (_enableKalmanFilter)
             {
                 for (int i = 0; i < _kalmanFilters.Length; i++)
                 {
                     _kalmanFilters[i] = new KalmanFilter();
-
                     _kalmanFilters[i].SetParameter(_timeInterval, _noise);
                     _kalmanFilters[i].Predict();
                 }
@@ -229,9 +225,11 @@ namespace PMC
                 }
             }
 
-            // Initialize global pose filters with separate parameters
             _globalAvatarPositionOneEuroFilter = new OneEuroFilter<Vector3>(_globalPoseFilterFrequency, _globalPoseFilterMinCutoff, _globalPoseFilterBeta, _globalPoseFilterDcutoff);
             _globalAvatarRotationOneEuroFilter = new OneEuroFilter<Quaternion>(_globalPoseFilterFrequency, _globalPoseFilterMinCutoff, _globalPoseFilterBeta, _globalPoseFilterDcutoff);
+
+
+            InitializePnP();
 
             _initialized = true;
         }
@@ -239,10 +237,6 @@ namespace PMC
         private IEnumerator Start()
         {
             if (!_initialized) yield break;
-
-            InitializePnP();
-
-            _stopwatch = Stopwatch.StartNew();
 
             var req = (AsyncGPUReadbackRequest)default;
 
@@ -259,13 +253,13 @@ namespace PMC
                 {
                     Image image = default;
 
-                    switch (_imageReadMode)
+                    switch (ImageReadMode)
                     {
                         case ImageReadMode.CPU:
                             {
                                 yield return waitForEndOfFrame;
 
-                                textureFrame.ReadTextureOnCPU(_imageSource.Texture);
+                                textureFrame.ReadTextureOnCPU(ImageSource.Texture);
                                 image = textureFrame.BuildCPUImage();
                                 textureFrame.Release();
 
@@ -273,7 +267,7 @@ namespace PMC
                             }
                         case ImageReadMode.CPUAsync:
                             {
-                                req = textureFrame.ReadTextureAsync(_imageSource.Texture);
+                                req = textureFrame.ReadTextureAsync(ImageSource.Texture);
 
                                 yield return waitUntilReqDone;
 
@@ -297,7 +291,7 @@ namespace PMC
                                     throw new Exception("ImageReadMode.GPU is not supported");
                                 }
 
-                                textureFrame.ReadTextureOnGPU(_imageSource.Texture);
+                                textureFrame.ReadTextureOnGPU(ImageSource.Texture);
                                 image = textureFrame.BuildGPUImage(glContext);
 
                                 yield return waitForEndOfFrame;
@@ -310,7 +304,7 @@ namespace PMC
 
                     image.Dispose();
 
-                    if (_imageReadMode == ImageReadMode.GPU)
+                    if (ImageReadMode == ImageReadMode.GPU)
                     {
                         textureFrame.Release();
                     }
@@ -324,18 +318,6 @@ namespace PMC
 
         private void Update()
         {
-            if (_useMainThread)
-            {
-                if (ResultQueue.TryDequeue(out var result))
-                {
-                    Set(result);
-
-                    UpdatePnP(result);
-
-                    OnCallback?.Invoke(result);
-                }
-            }
-
             _fpsTimer += Time.deltaTime;
 
             if (_fpsTimer >= 1f)
@@ -367,32 +349,13 @@ namespace PMC
             _pnpCamSpacePointMat?.Dispose();
         }
 
-        private void InitializeLandmark(Landmark[] landmarks)
-        {
-            for (int i = 0; i < landmarks.Length; i++)
-            {
-                landmarks[i] = new Landmark();
-
-                if (_enableKalmanFilter)
-                {
-                    landmarks[i].KalmanFilter.SetParameter(_timeInterval, _noise);
-                    landmarks[i].KalmanFilter.Predict();
-                }
-
-                if (_enableOneEuroFilter)
-                {
-                    landmarks[i].OneEuroFilter = new OneEuroFilter<Vector3>(_filterFrequency, _filterMinCutoff, _filterBeta, _filterDcutoff);
-                }
-            }
-        }
-
         private void InitializePnP()
         {
-            var max_d = Mathf.Max(_imageSource.Resolution.x, _imageSource.Resolution.y);
+            var max_d = Mathf.Max(ImageSource.Resolution.x, ImageSource.Resolution.y);
             _fx = max_d;
             _fy = max_d;
-            _cx = _imageSource.Resolution.x / 2.0f;
-            _cy = _imageSource.Resolution.y / 2.0f;
+            _cx = ImageSource.Resolution.x / 2f;
+            _cy = ImageSource.Resolution.y / 2f;
 
             _camMatrix = new Mat(3, 3, CvType.CV_64FC1);
             _camMatrix.put(0, 0, _fx);
@@ -411,20 +374,53 @@ namespace PMC
             _rvec = new Mat(3, 1, CvType.CV_64FC1);
             _tvec = new Mat(3, 1, CvType.CV_64FC1);
             _rotationMatrix = new Mat(3, 3, CvType.CV_64FC1);
+            _pnpObjectPointMat = new Mat(3, 1, CvType.CV_64FC1);
+            _pnpCamSpacePointMat = new Mat(3, 1, CvType.CV_64FC1);
 
             _invertYM = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(1, -1, 1));
             _invertZM = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(1, 1, -1));
             _transformationM = new Matrix4x4();
+        }
 
-            _pnpObjectPointMat = new Mat(3, 1, CvType.CV_64FC1);
-            _pnpCamSpacePointMat = new Mat(3, 1, CvType.CV_64FC1);
-            _tvecArr = new double[3];
+        private void ResultCallback(in HolisticLandmarkerResult holisticLandmarkerResult, Image image, long timestampMillisec)
+        {
+            ActiveFaceLandmark = Set(FaceLandmarks, holisticLandmarkerResult.faceLandmarks.landmarks);
+            ActivePoseLandmark = Set(PoseLandmarks, holisticLandmarkerResult.poseLandmarks.landmarks);
+            ActivePoseWorldLandmark = Set(PoseWorldLandmarks, holisticLandmarkerResult.poseWorldLandmarks.landmarks);
+            ActiveLeftHandLandmark = Set(LeftHandLandmarks, holisticLandmarkerResult.leftHandLandmarks.landmarks);
+            ActiveLeftHandWorldLandmark = Set(LeftHandWorldLandmarks, holisticLandmarkerResult.leftHandWorldLandmarks.landmarks);
+            ActiveRightHandLandmark = Set(RightHandLandmarks, holisticLandmarkerResult.rightHandLandmarks.landmarks);
+            ActiveRightHandWorldLandmark = Set(RightHandWorldLandmarks, holisticLandmarkerResult.rightHandWorldLandmarks.landmarks);
+            ActiveFaceBlendShapes = holisticLandmarkerResult.faceBlendshapes.categories != null && holisticLandmarkerResult.faceBlendshapes.categories.Count > 0;
+
+            if (ActiveFaceBlendShapes)
+            {
+                Categories = holisticLandmarkerResult.faceBlendshapes.categories;
+            }
+
+            foreach (var landmark in PoseWorldLandmarks)
+            {
+                if (_enableKalmanFilter)
+                {
+                    landmark.Position = landmark.KalmanFilter.Update(landmark.Position);
+                }
+
+                if (_enableOneEuroFilter)
+                {
+                    landmark.Position = landmark.OneEuroFilter.Filter(landmark.Position, (float)_stopwatch.Elapsed.TotalSeconds);
+                }
+            }
+
+            UpdatePnP(holisticLandmarkerResult);
+
+            Interlocked.Increment(ref _resultCallbackCount);
+
+            OnCallback?.Invoke(holisticLandmarkerResult);
         }
 
         private void UpdatePnP(HolisticLandmarkerResult result)
         {
-            if (result.poseLandmarks.landmarks == null || result.poseLandmarks.landmarks.Count == 0 ||
-                result.poseWorldLandmarks.landmarks == null || result.poseWorldLandmarks.landmarks.Count == 0) return;
+            if (!ActivePoseLandmark || !ActivePoseWorldLandmark) return;
 
             _objectPointsList.Clear();
             _imagePointsList.Clear();
@@ -432,10 +428,10 @@ namespace PMC
             foreach (int i in _pnpLandmarkIndices)
             {
                 var p3d = result.poseWorldLandmarks.landmarks[i];
-                _objectPointsList.Add(new Point3(p3d.x, -p3d.y, p3d.z));
-
                 var p2d = result.poseLandmarks.landmarks[i];
-                _imagePointsList.Add(new Point(p2d.x * _imageSource.Resolution.x, p2d.y * _imageSource.Resolution.y));
+
+                _objectPointsList.Add(new Point3(p3d.x, -p3d.y, p3d.z));
+                _imagePointsList.Add(new Point(p2d.x * ImageSource.Resolution.x, p2d.y * ImageSource.Resolution.y));
             }
 
             _objectPoints.fromList(_objectPointsList);
@@ -444,11 +440,15 @@ namespace PMC
             Calib3d.solvePnP(_objectPoints, _imagePoints, _camMatrix, _distCoeffs, _rvec, _tvec, true, Calib3d.SOLVEPNP_SQPNP);
             Calib3d.Rodrigues(_rvec, _rotationMatrix);
 
-            _tvec.get(0, 0, _tvecArr);
+            _tvec.get(0, 0, new double[3]);
+
+            var adjustedCameraSpacePoints = new Vector3[PoseLandmarkCount];
 
             for (int i = 0; i < PoseLandmarkCount; i++)
             {
                 var p3d = result.poseWorldLandmarks.landmarks[i];
+                var p2d = result.poseLandmarks.landmarks[i];
+
                 _pnpObjectPointMat.put(0, 0, p3d.x);
                 _pnpObjectPointMat.put(1, 0, -p3d.y);
                 _pnpObjectPointMat.put(2, 0, p3d.z);
@@ -456,29 +456,24 @@ namespace PMC
                 Core.gemm(_rotationMatrix, _pnpObjectPointMat, 1.0, _tvec, 1.0, _pnpCamSpacePointMat);
 
                 var z = _pnpCamSpacePointMat.get(2, 0)[0];
+                var x = (float)(((p2d.x * ImageSource.Resolution.x) - _cx) * z / _fx);
+                var y = (float)(((p2d.y * ImageSource.Resolution.y) - _cy) * z / _fy);
 
-                var p2d = result.poseLandmarks.landmarks[i];
-                var x_pixel = p2d.x * _imageSource.Resolution.x;
-                var y_pixel = p2d.y * _imageSource.Resolution.y;
-
-                var x = (float)((x_pixel - _cx) * z / _fx);
-                var y = (float)((y_pixel - _cy) * z / _fy);
-
-                _adjustedCameraSpacePoints[i] = new Vector3(x, y, (float)z);
+                adjustedCameraSpacePoints[i] = new Vector3(x, y, (float)z);
             }
 
-            var hipCenterPos = (_adjustedCameraSpacePoints[(int)PoseLandmark.LeftHip] + _adjustedCameraSpacePoints[(int)PoseLandmark.RightHip]) / 2f;
+            var hipCenterPos = (adjustedCameraSpacePoints[(int)PoseLandmark.LeftHip] + adjustedCameraSpacePoints[(int)PoseLandmark.RightHip]) / 2f;
 
             Calib3d.Rodrigues(_rvec, _rotationMatrix);
 
             var rot = OpenCVARUtils.ConvertRvecToRot(_rvec);
 
             _transformationM = Matrix4x4.TRS(hipCenterPos, rot, Vector3.one);
-            _ARM = _invertYM * _transformationM * _invertYM;
-            _ARM = _ARM * _invertYM * _invertZM;
 
-            GlobalAvatarPosition = _ARM.GetColumn(3);
-            GlobalAvatarRotation = UnityUtils.LookRotation(_ARM.GetColumn(2), _ARM.GetColumn(1));
+            var ARM = _invertYM * _transformationM * _invertYM * _invertYM * _invertZM;
+
+            GlobalAvatarPosition = ARM.GetColumn(3);
+            GlobalAvatarRotation = UnityUtils.LookRotation(ARM.GetColumn(2), ARM.GetColumn(1));
 
             if (_enableGlobalPoseFilter)
             {
@@ -490,7 +485,8 @@ namespace PMC
 
             for (int i = 0; i < PoseLandmarkCount; i++)
             {
-                LocalAvatarSpacePoints[i] = Vector3.Scale(localRotInverse * (_adjustedCameraSpacePoints[i] - hipCenterPos), _landmarkScale);
+                LocalAvatarSpacePoints[i] = localRotInverse * (adjustedCameraSpacePoints[i] - hipCenterPos);
+                //LocalAvatarSpacePoints[i] = Vector3.Scale(localRotInverse * (adjustedCameraSpacePoints[i] - hipCenterPos), LandmarkScale);
 
                 if (_enableKalmanFilter)
                 {
@@ -504,34 +500,6 @@ namespace PMC
             }
         }
 
-        private void ResultCallback(in HolisticLandmarkerResult holisticLandmarkerResult, Image image, long timestampMillisec)
-        {
-            if (_useMainThread)
-            {
-                ResultQueue.Enqueue(holisticLandmarkerResult);
-            }
-            else
-            {
-                Set(holisticLandmarkerResult);
-
-                OnCallback?.Invoke(holisticLandmarkerResult);
-            }
-
-
-            Interlocked.Increment(ref _resultCallbackCount);
-        }
-
-        private void Set(HolisticLandmarkerResult result)
-        {
-            ActiveFaceLandmark = Set(FaceLandmarks, result.faceLandmarks.landmarks);
-            ActivePoseLandmark = Set(PoseLandmarks, result.poseLandmarks.landmarks);
-            ActivePoseWorldLandmark = Set(PoseWorldLandmarks, result.poseWorldLandmarks.landmarks);
-            ActiveLeftHandLandmark = Set(LeftHandLandmarks, result.leftHandLandmarks.landmarks);
-            ActiveLeftHandWorldLandmark = Set(LeftHandWorldLandmarks, result.leftHandWorldLandmarks.landmarks);
-            ActiveRightHandLandmark = Set(RightHandLandmarks, result.rightHandLandmarks.landmarks);
-            ActiveRightHandWorldLandmark = Set(RightHandWorldLandmarks, result.rightHandWorldLandmarks.landmarks);
-        }
-
         private bool Set(Landmark[] landmarks, List<Mediapipe.Tasks.Components.Containers.NormalizedLandmark> normalizedLandmarks)
         {
             if (normalizedLandmarks == null || normalizedLandmarks.Count == 0) return false;
@@ -540,17 +508,7 @@ namespace PMC
             {
                 landmarks[i].Set(normalizedLandmarks[i]);
 
-                landmarks[i].Position = Vector3.Scale(landmarks[i].Position, _landmarkScale);
-
-                if (_enableKalmanFilter)
-                {
-                    landmarks[i].Position = landmarks[i].KalmanFilter.Update(landmarks[i].Position);
-                }
-
-                if (_enableOneEuroFilter)
-                {
-                    landmarks[i].Position = landmarks[i].OneEuroFilter.Filter(landmarks[i].Position, (float)_stopwatch.Elapsed.TotalSeconds);
-                }
+                //landmarks[i].Position = Vector3.Scale(landmarks[i].Position, LandmarkScale);
             }
 
             return true;
@@ -564,27 +522,10 @@ namespace PMC
             {
                 landmarks[i].Set(normalizedLandmarks[i]);
 
-                landmarks[i].Position = Vector3.Scale(landmarks[i].Position, _landmarkScale);
-
-                if (_enableKalmanFilter)
-                {
-                    landmarks[i].Position = landmarks[i].KalmanFilter.Update(landmarks[i].Position);
-                }
-
-                if (_enableOneEuroFilter)
-                {
-                    landmarks[i].Position = landmarks[i].OneEuroFilter.Filter(landmarks[i].Position, (float)_stopwatch.Elapsed.TotalSeconds);
-                }
+                //landmarks[i].Position = Vector3.Scale(landmarks[i].Position, LandmarkScale);
             }
 
             return normalizedLandmarks != null;
         }
-    }
-
-    public enum ImageReadMode
-    {
-        CPU,
-        CPUAsync,
-        GPU,
     }
 }

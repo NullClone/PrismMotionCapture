@@ -213,19 +213,4 @@ namespace PMC
             Graphics.Blit(srcTexture, dstTexture, scale, offset);
         }
     }
-
-    public enum SourceType
-    {
-        Texture,
-        Video,
-        Webcam,
-    }
-
-    public enum RenderMode
-    {
-        None,
-        RenderTexture,
-        Renderer,
-        RawImage,
-    }
 }

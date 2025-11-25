@@ -1,11 +1,9 @@
-using Mediapipe.Tasks.Components.Containers;
 using PMC.Utilities;
 using RootMotion;
 using RootMotion.FinalIK;
 using System.Collections.Generic;
 using UnityEngine;
 using UniVRM10;
-using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace PMC
 {
@@ -49,8 +47,9 @@ namespace PMC
         private FullBodyBipedIK _FBBIK;
         private FBBIKHeadEffector _headEffector;
         private TwistRelaxer _twistRelaxer;
-
         private Vrm10Instance _vrm;
+
+        private bool _initialized = false;
 
         private Transform _root;
         private Transform _headTarget;
@@ -69,7 +68,6 @@ namespace PMC
         private Transform _leftThighTarget;
         private Transform _rightThighTarget;
 
-        private Vector3 _baseScale;
         private Vector3 _basePosition;
         private Vector3 _baseTrackingPosition;
         private Vector3 _pelvisBasePosition;
@@ -80,44 +78,6 @@ namespace PMC
         private float _currentRightLegWeight = 0f;
         private float _currentLeftBendWeight = 0f;
         private float _currentRightBendWeight = 0f;
-
-        private float _sittingHeight;
-
-        private float _eyeBlinkLeft;
-        private float _eyeBlinkRight;
-        private float _eyeLookDownLeft;
-        private float _eyeLookDownRight;
-        private float _eyeLookInLeft;
-        private float _eyeLookInRight;
-        private float _eyeLookOutLeft;
-        private float _eyeLookOutRight;
-        private float _eyeLookUpLeft;
-        private float _eyeLookUpRight;
-
-        private float _jawOpen;
-        private float _mouthClose;
-        private float _mouthFunnel;
-        private float _mouthPucker;
-        private float _mouthLeft;
-        private float _mouthRight;
-        private float _mouthSmileLeft;
-        private float _mouthSmileRight;
-        private float _mouthFrownLeft;
-        private float _mouthFrownRight;
-        private float _mouthDimpleLeft;
-        private float _mouthDimpleRight;
-        private float _mouthStretchLeft;
-        private float _mouthStretchRight;
-        private float _mouthRollLower;
-        private float _mouthRollUpper;
-        private float _mouthShrugLower;
-        private float _mouthShrugUpper;
-        private float _mouthPressLeft;
-        private float _mouthPressRight;
-        private float _mouthLowerDownLeft;
-        private float _mouthLowerDownRight;
-        private float _mouthUpperUpLeft;
-        private float _mouthUpperUpRight;
 
         private float _lastBlinkLeft;
         private float _lastBlinkRight;
@@ -138,8 +98,6 @@ namespace PMC
         private float _nextBlink = 4f;
         private float _blinkState;
 
-        private Stopwatch _stopwatch;
-
         private readonly TimeInterpolate _blinkInterpolate = new();
         private readonly TimeInterpolate _gazeInterpolate = new();
         private readonly TimeInterpolate _mouthInterpolate = new();
@@ -152,7 +110,11 @@ namespace PMC
 
         private void Awake()
         {
-            if (!enabled) return;
+            if (!enabled || _tracker == null) return;
+
+            _vrm = gameObject.GetComponent<Vrm10Instance>();
+
+            if (_vrm == null) return;
 
             _animator = gameObject.GetComponent<Animator>();
 
@@ -180,8 +142,6 @@ namespace PMC
                 }
             }
 
-            _vrm = gameObject.GetComponent<Vrm10Instance>();
-
             if (_IKType == IKType.VRIK)
             {
                 _VRIK.solver.OnPreUpdate += OnPreVRIK;
@@ -191,13 +151,13 @@ namespace PMC
             {
                 _FBBIK.solver.OnPreUpdate += OnPreFBBIK;
             }
+
+            _initialized = true;
         }
 
         private void Start()
         {
-            if (!enabled) return;
-
-            _stopwatch = Stopwatch.StartNew();
+            if (!_initialized) return;
 
             CreateTarget();
 
@@ -216,14 +176,12 @@ namespace PMC
 
         private void OnDestroy()
         {
-            if (!enabled) return;
-
-            if (_IKType == IKType.VRIK)
+            if (_IKType == IKType.VRIK && _VRIK)
             {
                 _VRIK.solver.OnPreUpdate -= OnPreVRIK;
             }
 
-            if (_IKType == IKType.FBBIK)
+            if (_IKType == IKType.FBBIK && _FBBIK)
             {
                 _FBBIK.solver.OnPreUpdate -= OnPreFBBIK;
             }
@@ -233,16 +191,15 @@ namespace PMC
         {
             UpdateMovement();
 
-            var pelvisTargetRight = Quaternion.Inverse(_pelvisTarget.rotation) * _VRIK.references.root.right;
-
-            _VRIK.references.pelvis.position = Vector3.Lerp(_VRIK.references.pelvis.position, _pelvisTarget.position, _VRIK.solver.spine.pelvisPositionWeight);
-            _VRIK.references.pelvis.rotation = Quaternion.Slerp(_VRIK.references.pelvis.rotation, _pelvisTarget.rotation, _VRIK.solver.spine.pelvisRotationWeight);
+            //var pelvisTargetRight = Quaternion.Inverse(_pelvisTarget.rotation) * _VRIK.references.root.right;
+            //_VRIK.references.pelvis.position = Vector3.Lerp(_VRIK.references.pelvis.position, _pelvisTarget.position, _VRIK.solver.spine.pelvisPositionWeight);
+            //_VRIK.references.pelvis.rotation = Quaternion.Slerp(_VRIK.references.pelvis.rotation, _pelvisTarget.rotation, _VRIK.solver.spine.pelvisRotationWeight);
 
             UpdateTarget();
             UpdateVRIK();
             UpdateFinger();
 
-            if (_enableFaceTracking)
+            if (_enableFaceTracking && _vrm)
             {
                 UpdateBlink();
                 UpdateGaze();
@@ -257,11 +214,133 @@ namespace PMC
             UpdateFBBIK();
             UpdateFinger();
 
-            if (_enableFaceTracking)
+            if (_enableFaceTracking && _vrm)
             {
                 UpdateBlink();
                 UpdateGaze();
                 UpdateMouth();
+            }
+        }
+
+        private void CreateTarget()
+        {
+            _root = new GameObject($"{name} (Tracking Space)").transform;
+            _headTarget = new GameObject("Head Target").transform;
+            _pelvisTarget = new GameObject("Pelvis Target").transform;
+            _chestGoal = new GameObject("Chest Goal").transform;
+            _leftHandTarget = new GameObject("Left Hand Target").transform;
+            _rightHandTarget = new GameObject("Right Hand Target").transform;
+            _leftArmBendGoal = new GameObject("Left Arm Bend Goal").transform;
+            _rightArmBendGoal = new GameObject("Right Arm Bend Goal").transform;
+            _leftShoulderTarget = new GameObject("Left Shoulder Target").transform;
+            _rightShoulderTarget = new GameObject("Right Shoulder Target").transform;
+            _leftFootTarget = new GameObject("Left Foot Target").transform;
+            _rightFootTarget = new GameObject("Right Foot Target").transform;
+            _leftLegBendGoal = new GameObject("Left Leg Bend Goal").transform;
+            _rightLegBendGoal = new GameObject("Right Leg Bend Goal").transform;
+            _leftThighTarget = new GameObject("Left Thigh Target").transform;
+            _rightThighTarget = new GameObject("Right Thigh Target").transform;
+
+            _headTarget.parent = _root;
+            _pelvisTarget.parent = _root;
+            _chestGoal.parent = _root;
+            _leftHandTarget.parent = _root;
+            _rightHandTarget.parent = _root;
+            _leftArmBendGoal.parent = _root;
+            _rightArmBendGoal.parent = _root;
+            _leftShoulderTarget.parent = _root;
+            _rightShoulderTarget.parent = _root;
+            _leftFootTarget.parent = _root;
+            _rightFootTarget.parent = _root;
+            _leftLegBendGoal.parent = _root;
+            _rightLegBendGoal.parent = _root;
+            _leftThighTarget.parent = _root;
+            _rightThighTarget.parent = _root;
+        }
+
+        private void InitializeFinger()
+        {
+            foreach (var bone in new HumanBodyBones[]
+                {
+                    HumanBodyBones.LeftLittleDistal,
+                    HumanBodyBones.LeftLittleIntermediate,
+                    HumanBodyBones.LeftLittleProximal,
+                    HumanBodyBones.LeftRingDistal,
+                    HumanBodyBones.LeftRingIntermediate,
+                    HumanBodyBones.LeftRingProximal,
+                    HumanBodyBones.LeftMiddleDistal,
+                    HumanBodyBones.LeftMiddleIntermediate,
+                    HumanBodyBones.LeftMiddleProximal,
+                    HumanBodyBones.LeftIndexDistal,
+                    HumanBodyBones.LeftIndexIntermediate,
+                    HumanBodyBones.LeftIndexProximal,
+                    HumanBodyBones.LeftThumbDistal,
+                    HumanBodyBones.LeftThumbIntermediate,
+                    HumanBodyBones.LeftThumbProximal,
+                    HumanBodyBones.RightLittleDistal,
+                    HumanBodyBones.RightLittleIntermediate,
+                    HumanBodyBones.RightLittleProximal,
+                    HumanBodyBones.RightRingDistal,
+                    HumanBodyBones.RightRingIntermediate,
+                    HumanBodyBones.RightRingProximal,
+                    HumanBodyBones.RightMiddleDistal,
+                    HumanBodyBones.RightMiddleIntermediate,
+                    HumanBodyBones.RightMiddleProximal,
+                    HumanBodyBones.RightIndexDistal,
+                    HumanBodyBones.RightIndexIntermediate,
+                    HumanBodyBones.RightIndexProximal,
+                    HumanBodyBones.RightThumbDistal,
+                    HumanBodyBones.RightThumbIntermediate,
+                    HumanBodyBones.RightThumbProximal,
+                })
+            {
+                var transform = _animator.GetBoneTransform(bone);
+
+                if (transform == null) continue;
+
+                _initialLocalRotations.Add(bone, transform.localRotation);
+
+                if (!_initialBoneDirections.ContainsKey(bone))
+                {
+                    if (transform.childCount > 0)
+                    {
+                        _initialBoneDirections.Add(bone, transform.InverseTransformPoint(transform.GetChild(0).position).normalized);
+                    }
+                    else
+                    {
+                        if (transform.parent != null)
+                        {
+                            _initialBoneDirections.Add(bone, transform.parent.InverseTransformPoint(transform.position).normalized);
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"Cannot determine initial bone direction for {bone}.");
+                        }
+                    }
+                }
+            }
+
+            var leftHandTransform = _animator.GetBoneTransform(HumanBodyBones.LeftHand);
+            var rightHandTransform = _animator.GetBoneTransform(HumanBodyBones.RightHand);
+            var lMidProx = _animator.GetBoneTransform(HumanBodyBones.LeftMiddleProximal);
+            var rMidProx = _animator.GetBoneTransform(HumanBodyBones.RightMiddleProximal);
+
+            if (leftHandTransform != null && lMidProx != null)
+            {
+                _initialLocalRotations.Add(HumanBodyBones.LeftHand, leftHandTransform.localRotation);
+
+                var forward = (leftHandTransform.position - lMidProx.position).normalized;
+
+                _inverseLeftHandRotation = Quaternion.Inverse(UnityUtils.LookRotation(forward, leftHandTransform.up)) * leftHandTransform.rotation;
+            }
+
+            if (rightHandTransform != null && rMidProx != null)
+            {
+                _initialLocalRotations.Add(HumanBodyBones.RightHand, rightHandTransform.localRotation);
+
+                var forward = (rightHandTransform.position - rMidProx.position).normalized;
+
+                _inverseRightHandRotation = Quaternion.Inverse(UnityUtils.LookRotation(forward, rightHandTransform.up)) * rightHandTransform.rotation;
             }
         }
 
@@ -274,9 +353,7 @@ namespace PMC
             _VRIK.solver.IKPositionWeight = 0f;
 
             _basePosition = _VRIK.references.root.position;
-            _baseScale = _VRIK.references.root.localScale;
             _pelvisBasePosition = _VRIK.references.pelvis.localPosition;
-            _sittingHeight = Vector3.Distance(_VRIK.references.head.position, _VRIK.references.pelvis.position);
 
             _root.position = _VRIK.references.pelvis.position;
             _headTarget.position = _VRIK.references.head.position;
@@ -299,7 +376,7 @@ namespace PMC
             _VRIK.solver.spine.headClampWeight = 0f;
             _VRIK.solver.spine.maxRootAngle = 20f;
             _VRIK.solver.spine.maintainPelvisPosition = 0.2f;
-            _VRIK.solver.plantFeet = true;
+            _VRIK.solver.plantFeet = false;
 
             _VRIK.solver.spine.headTarget = _headTarget;
             _VRIK.solver.spine.pelvisTarget = _pelvisTarget;
@@ -381,9 +458,7 @@ namespace PMC
             _FBBIK.solver.IKPositionWeight = 0f;
 
             _basePosition = _FBBIK.references.root.position;
-            _baseScale = _FBBIK.references.root.localScale;
             _pelvisBasePosition = _FBBIK.references.pelvis.localPosition;
-            _sittingHeight = Vector3.Distance(_FBBIK.references.head.position, _FBBIK.references.pelvis.position);
 
             _root.position = _FBBIK.references.pelvis.position;
             _headTarget.position = _FBBIK.references.head.position;
@@ -476,128 +551,6 @@ namespace PMC
             }
 
             _FBBIK.solver.IKPositionWeight = 1f;
-        }
-
-        private void InitializeFinger()
-        {
-            foreach (var bone in new HumanBodyBones[]
-                {
-                    HumanBodyBones.LeftLittleDistal,
-                    HumanBodyBones.LeftLittleIntermediate,
-                    HumanBodyBones.LeftLittleProximal,
-                    HumanBodyBones.LeftRingDistal,
-                    HumanBodyBones.LeftRingIntermediate,
-                    HumanBodyBones.LeftRingProximal,
-                    HumanBodyBones.LeftMiddleDistal,
-                    HumanBodyBones.LeftMiddleIntermediate,
-                    HumanBodyBones.LeftMiddleProximal,
-                    HumanBodyBones.LeftIndexDistal,
-                    HumanBodyBones.LeftIndexIntermediate,
-                    HumanBodyBones.LeftIndexProximal,
-                    HumanBodyBones.LeftThumbDistal,
-                    HumanBodyBones.LeftThumbIntermediate,
-                    HumanBodyBones.LeftThumbProximal,
-                    HumanBodyBones.RightLittleDistal,
-                    HumanBodyBones.RightLittleIntermediate,
-                    HumanBodyBones.RightLittleProximal,
-                    HumanBodyBones.RightRingDistal,
-                    HumanBodyBones.RightRingIntermediate,
-                    HumanBodyBones.RightRingProximal,
-                    HumanBodyBones.RightMiddleDistal,
-                    HumanBodyBones.RightMiddleIntermediate,
-                    HumanBodyBones.RightMiddleProximal,
-                    HumanBodyBones.RightIndexDistal,
-                    HumanBodyBones.RightIndexIntermediate,
-                    HumanBodyBones.RightIndexProximal,
-                    HumanBodyBones.RightThumbDistal,
-                    HumanBodyBones.RightThumbIntermediate,
-                    HumanBodyBones.RightThumbProximal,
-                })
-            {
-                var transform = _animator.GetBoneTransform(bone);
-
-                if (transform == null) continue;
-
-                _initialLocalRotations.Add(bone, transform.localRotation);
-
-                if (!_initialBoneDirections.ContainsKey(bone))
-                {
-                    if (transform.childCount > 0)
-                    {
-                        _initialBoneDirections.Add(bone, transform.InverseTransformPoint(transform.GetChild(0).position).normalized);
-                    }
-                    else
-                    {
-                        if (transform.parent != null)
-                        {
-                            _initialBoneDirections.Add(bone, transform.parent.InverseTransformPoint(transform.position).normalized);
-                        }
-                        else
-                        {
-                            Debug.LogWarning($"Cannot determine initial bone direction for {bone}.");
-                        }
-                    }
-                }
-            }
-
-            var leftHandTransform = _animator.GetBoneTransform(HumanBodyBones.LeftHand);
-            var rightHandTransform = _animator.GetBoneTransform(HumanBodyBones.RightHand);
-            var lMidProx = _animator.GetBoneTransform(HumanBodyBones.LeftMiddleProximal);
-            var rMidProx = _animator.GetBoneTransform(HumanBodyBones.RightMiddleProximal);
-
-            if (leftHandTransform != null && lMidProx != null)
-            {
-                _initialLocalRotations.Add(HumanBodyBones.LeftHand, leftHandTransform.localRotation);
-
-                var forward = (leftHandTransform.position - lMidProx.position).normalized;
-
-                _inverseLeftHandRotation = Quaternion.Inverse(UnityUtils.LookRotation(forward, leftHandTransform.up)) * leftHandTransform.rotation;
-            }
-
-            if (rightHandTransform != null && rMidProx != null)
-            {
-                _initialLocalRotations.Add(HumanBodyBones.RightHand, rightHandTransform.localRotation);
-
-                var forward = (rightHandTransform.position - rMidProx.position).normalized;
-
-                _inverseRightHandRotation = Quaternion.Inverse(UnityUtils.LookRotation(forward, rightHandTransform.up)) * rightHandTransform.rotation;
-            }
-        }
-
-        private void CreateTarget()
-        {
-            _root = new GameObject($"{name} (Tracking Space)").transform;
-            _headTarget = new GameObject("Head Target").transform;
-            _pelvisTarget = new GameObject("Pelvis Target").transform;
-            _chestGoal = new GameObject("Chest Goal").transform;
-            _leftHandTarget = new GameObject("Left Hand Target").transform;
-            _rightHandTarget = new GameObject("Right Hand Target").transform;
-            _leftArmBendGoal = new GameObject("Left Arm Bend Goal").transform;
-            _rightArmBendGoal = new GameObject("Right Arm Bend Goal").transform;
-            _leftShoulderTarget = new GameObject("Left Shoulder Target").transform;
-            _rightShoulderTarget = new GameObject("Right Shoulder Target").transform;
-            _leftFootTarget = new GameObject("Left Foot Target").transform;
-            _rightFootTarget = new GameObject("Right Foot Target").transform;
-            _leftLegBendGoal = new GameObject("Left Leg Bend Goal").transform;
-            _rightLegBendGoal = new GameObject("Right Leg Bend Goal").transform;
-            _leftThighTarget = new GameObject("Left Thigh Target").transform;
-            _rightThighTarget = new GameObject("Right Thigh Target").transform;
-
-            _headTarget.parent = _root;
-            _pelvisTarget.parent = _root;
-            _chestGoal.parent = _root;
-            _leftHandTarget.parent = _root;
-            _rightHandTarget.parent = _root;
-            _leftArmBendGoal.parent = _root;
-            _rightArmBendGoal.parent = _root;
-            _leftShoulderTarget.parent = _root;
-            _rightShoulderTarget.parent = _root;
-            _leftFootTarget.parent = _root;
-            _rightFootTarget.parent = _root;
-            _leftLegBendGoal.parent = _root;
-            _rightLegBendGoal.parent = _root;
-            _leftThighTarget.parent = _root;
-            _rightThighTarget.parent = _root;
         }
 
         private void UpdateMovement()
@@ -780,253 +733,6 @@ namespace PMC
             _rightThighTarget.localPosition = _tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHip].Position;
         }
 
-        private void UpdateFinger()
-        {
-            if (!_enableHandTracking) return;
-
-            if (_tracker.ActiveLeftHandWorldLandmark)
-            {
-                var lHandTransform = _animator.GetBoneTransform(HumanBodyBones.LeftHand);
-
-                var lHandUp = UnityUtils.TriangleNormal(
-                                        _tracker.LeftHandWorldLandmarks[(int)HandLandmark.Wrist].Position,
-                                        _tracker.LeftHandWorldLandmarks[(int)HandLandmark.PinkyMcp].Position,
-                                        _tracker.LeftHandWorldLandmarks[(int)HandLandmark.IndexFingerMcp].Position);
-                var lHandForward = (_tracker.LeftHandWorldLandmarks[(int)HandLandmark.Wrist].Position - _tracker.LeftHandWorldLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
-
-                lHandTransform.rotation = UnityUtils.LookRotation(lHandForward, lHandUp) * _inverseLeftHandRotation;
-
-                var invLeftHandWorldRot = Quaternion.Inverse(lHandTransform.rotation);
-
-                ComputeFingerRotation(HumanBodyBones.LeftThumbProximal, HandLandmark.ThumbCmc, invLeftHandWorldRot);
-                ComputeFingerRotation(HumanBodyBones.LeftIndexProximal, HandLandmark.IndexFingerMcp, invLeftHandWorldRot);
-                ComputeFingerRotation(HumanBodyBones.LeftMiddleProximal, HandLandmark.MiddleFingerMcp, invLeftHandWorldRot);
-                ComputeFingerRotation(HumanBodyBones.LeftRingProximal, HandLandmark.RingFingerMcp, invLeftHandWorldRot);
-                ComputeFingerRotation(HumanBodyBones.LeftLittleProximal, HandLandmark.PinkyMcp, invLeftHandWorldRot);
-            }
-            else
-            {
-                ResetHandBones(false);
-            }
-
-            if (_tracker.ActiveRightHandWorldLandmark)
-            {
-                var rHandTransform = _animator.GetBoneTransform(HumanBodyBones.RightHand);
-
-                var rHandUp = UnityUtils.TriangleNormal(
-                                        _tracker.RightHandWorldLandmarks[(int)HandLandmark.Wrist].Position,
-                                        _tracker.RightHandWorldLandmarks[(int)HandLandmark.IndexFingerMcp].Position,
-                                        _tracker.RightHandWorldLandmarks[(int)HandLandmark.PinkyMcp].Position);
-                var rHandForward = (_tracker.RightHandWorldLandmarks[(int)HandLandmark.Wrist].Position - _tracker.RightHandWorldLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
-
-                rHandTransform.rotation = UnityUtils.LookRotation(rHandForward, rHandUp) * _inverseRightHandRotation;
-
-                var invRightHandWorldRot = Quaternion.Inverse(rHandTransform.rotation);
-
-                ComputeFingerRotation(HumanBodyBones.RightThumbProximal, HandLandmark.ThumbCmc, invRightHandWorldRot);
-                ComputeFingerRotation(HumanBodyBones.RightIndexProximal, HandLandmark.IndexFingerMcp, invRightHandWorldRot);
-                ComputeFingerRotation(HumanBodyBones.RightMiddleProximal, HandLandmark.MiddleFingerMcp, invRightHandWorldRot);
-                ComputeFingerRotation(HumanBodyBones.RightRingProximal, HandLandmark.RingFingerMcp, invRightHandWorldRot);
-                ComputeFingerRotation(HumanBodyBones.RightLittleProximal, HandLandmark.PinkyMcp, invRightHandWorldRot);
-            }
-            else
-            {
-                ResetHandBones(true);
-            }
-        }
-
-        private void UpdateFace(List<Category> categories)
-        {
-            if (categories == null || categories.Count == 0) return;
-
-            _eyeBlinkLeft = categories[(int)FaceBlendShapes.EyeBlinkLeft].score;
-            _eyeBlinkRight = categories[(int)FaceBlendShapes.EyeBlinkRight].score;
-            _eyeLookDownLeft = categories[(int)FaceBlendShapes.EyeLookDownLeft].score;
-            _eyeLookDownRight = categories[(int)FaceBlendShapes.EyeLookDownRight].score;
-            _eyeLookInLeft = categories[(int)FaceBlendShapes.EyeLookInLeft].score;
-            _eyeLookInRight = categories[(int)FaceBlendShapes.EyeLookInRight].score;
-            _eyeLookOutLeft = categories[(int)FaceBlendShapes.EyeLookOutLeft].score;
-            _eyeLookOutRight = categories[(int)FaceBlendShapes.EyeLookOutRight].score;
-            _eyeLookUpLeft = categories[(int)FaceBlendShapes.EyeLookUpLeft].score;
-            _eyeLookUpRight = categories[(int)FaceBlendShapes.EyeLookUpRight].score;
-
-            _jawOpen = categories[(int)FaceBlendShapes.JawOpen].score;
-            _mouthClose = categories[(int)FaceBlendShapes.MouthClose].score;
-            _mouthFunnel = categories[(int)FaceBlendShapes.MouthFunnel].score;
-            _mouthPucker = categories[(int)FaceBlendShapes.MouthPucker].score;
-            _mouthLeft = categories[(int)FaceBlendShapes.MouthLeft].score;
-            _mouthRight = categories[(int)FaceBlendShapes.MouthRight].score;
-            _mouthSmileLeft = categories[(int)FaceBlendShapes.MouthSmileLeft].score;
-            _mouthSmileRight = categories[(int)FaceBlendShapes.MouthSmileRight].score;
-            _mouthFrownLeft = categories[(int)FaceBlendShapes.MouthFrownLeft].score;
-            _mouthFrownRight = categories[(int)FaceBlendShapes.MouthFrownRight].score;
-            _mouthDimpleLeft = categories[(int)FaceBlendShapes.MouthDimpleLeft].score;
-            _mouthDimpleRight = categories[(int)FaceBlendShapes.MouthDimpleRight].score;
-            _mouthStretchLeft = categories[(int)FaceBlendShapes.MouthStretchLeft].score;
-            _mouthStretchRight = categories[(int)FaceBlendShapes.MouthStretchRight].score;
-            _mouthRollLower = categories[(int)FaceBlendShapes.MouthRollLower].score;
-            _mouthRollUpper = categories[(int)FaceBlendShapes.MouthRollUpper].score;
-            _mouthShrugLower = categories[(int)FaceBlendShapes.MouthShrugLower].score;
-            _mouthShrugUpper = categories[(int)FaceBlendShapes.MouthShrugUpper].score;
-            _mouthPressLeft = categories[(int)FaceBlendShapes.MouthPressLeft].score;
-            _mouthPressRight = categories[(int)FaceBlendShapes.MouthPressRight].score;
-            _mouthLowerDownLeft = categories[(int)FaceBlendShapes.MouthLowerDownLeft].score;
-            _mouthLowerDownRight = categories[(int)FaceBlendShapes.MouthLowerDownRight].score;
-            _mouthUpperUpLeft = categories[(int)FaceBlendShapes.MouthUpperUpLeft].score;
-            _mouthUpperUpRight = categories[(int)FaceBlendShapes.MouthUpperUpRight].score;
-        }
-
-        private void UpdateBlink()
-        {
-            if (_vrm == null) return;
-
-            if (_autoBlink)
-            {
-                if (_blinking)
-                {
-                    _blinkState += Time.deltaTime * 20f;
-
-                    if (_blinkState >= 2.0)
-                    {
-                        _blinking = false;
-                        _blinkState = 0.0f;
-                        _blinkTimer = Time.time;
-                        _nextBlink = Random.Range(1f, 4f);
-                    }
-                }
-                else if (Time.time - _blinkTimer > _nextBlink)
-                {
-                    _blinking = true;
-                }
-
-                var weight = _blinkState <= 1.0 ? _blinkState : 2f - _blinkState;
-
-                _vrm.Runtime.Expression.SetWeight(ExpressionKey.Blink, weight);
-            }
-            else
-            {
-                var targetLeft = CalculateBlinkValueFromARKit(_eyeBlinkLeft, _eyeOpenedThreshold, _eyeClosedThreshold);
-                var targetRight = CalculateBlinkValueFromARKit(_eyeBlinkRight, _eyeOpenedThreshold, _eyeClosedThreshold);
-
-                var t = _blinkInterpolate.Interpolate();
-                var smoothedLeft = Mathf.Lerp(_lastBlinkLeft, _currentBlinkLeft, t);
-                var smoothedRight = Mathf.Lerp(_lastBlinkRight, _currentBlinkRight, t);
-
-                if (_linkBlinks && !_allowWinking)
-                {
-                    var weight = Mathf.Max(smoothedLeft, smoothedRight);
-
-                    _vrm.Runtime.Expression.SetWeight(ExpressionKey.Blink, weight);
-                }
-                else
-                {
-                    _vrm.Runtime.Expression.SetWeight(ExpressionKey.BlinkLeft, smoothedLeft);
-                    _vrm.Runtime.Expression.SetWeight(ExpressionKey.BlinkRight, smoothedRight);
-                }
-
-                _blinkInterpolate.UpdateTime(Time.timeAsDouble);
-
-                if (_linkBlinks && _allowWinking && Mathf.Abs(targetRight - targetLeft) < _smartWinkThreshold)
-                {
-                    var maxBlink = Mathf.Max(targetLeft, targetRight);
-
-                    targetLeft = maxBlink;
-                    targetRight = maxBlink;
-                }
-
-                _lastBlinkLeft = smoothedLeft;
-                _lastBlinkRight = smoothedRight;
-
-                _currentBlinkLeft = Mathf.Lerp(_currentBlinkLeft, targetLeft, 1f - _blinkSmoothing);
-                _currentBlinkRight = Mathf.Lerp(_currentBlinkRight, targetRight, 1f - _blinkSmoothing);
-            }
-        }
-
-        private void UpdateGaze()
-        {
-            if (_vrm == null || !_gazeTracking) return;
-
-            var targetLookUp = (_eyeLookUpLeft + _eyeLookUpRight) / 2f;
-            var targetLookDown = (_eyeLookDownLeft + _eyeLookDownRight) / 2f;
-            var targetLookLeft = (_eyeLookInLeft + _eyeLookOutRight) / 2f;
-            var targetLookRight = (_eyeLookOutLeft + _eyeLookInRight) / 2f;
-
-            var t = _gazeInterpolate.Interpolate();
-
-            var smoothedLookUp = Mathf.Lerp(_lastLookUp, targetLookUp, 1f - _gazeSmoothing);
-            var smoothedLookDown = Mathf.Lerp(_lastLookDown, targetLookDown, 1f - _gazeSmoothing);
-            var smoothedLookLeft = Mathf.Lerp(_lastLookLeft, targetLookLeft, 1f - _gazeSmoothing);
-            var smoothedLookRight = Mathf.Lerp(_lastLookRight, targetLookRight, 1f - _gazeSmoothing);
-
-            _lastLookUp = smoothedLookUp;
-            _lastLookDown = smoothedLookDown;
-            _lastLookLeft = smoothedLookLeft;
-            _lastLookRight = smoothedLookRight;
-
-            _currentLookUp = smoothedLookUp;
-            _currentLookDown = smoothedLookDown;
-            _currentLookLeft = smoothedLookLeft;
-            _currentLookRight = smoothedLookRight;
-
-            _gazeInterpolate.UpdateTime(Time.timeAsDouble);
-
-            if (_leftEyeBone != null && _rightEyeBone != null)
-            {
-                var lookUpDown = _currentLookUp - _currentLookDown;
-                var lookLeftRight = _currentLookRight - _currentLookLeft;
-
-                _vrm.Runtime.LookAt.SetYawPitchManually(
-                    _gazeFactor.x * _gazeStrength * lookLeftRight,
-                    _gazeFactor.y * _gazeStrength * lookUpDown);
-            }
-
-            //_vrm.Runtime.Expression.SetWeight(ExpressionKey.LookUp, _currentLookUp * _gazeStrength);
-            //_vrm.Runtime.Expression.SetWeight(ExpressionKey.LookDown, _currentLookDown * _gazeStrength);
-            //_vrm.Runtime.Expression.SetWeight(ExpressionKey.LookLeft, _currentLookLeft * _gazeStrength);
-            //_vrm.Runtime.Expression.SetWeight(ExpressionKey.LookRight, _currentLookRight * _gazeStrength);
-        }
-
-        private void UpdateMouth()
-        {
-            if (_vrm == null) return;
-
-            var t = _mouthInterpolate.Interpolate();
-
-            var mouthOpen = _jawOpen * _mouthOpenSensitivity;
-            var au = Mathf.Lerp(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Aa), mouthOpen, 1f - _mouthSmoothing);
-
-            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Aa, au);
-            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ih, 0);
-            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ou, 0);
-            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ee, 0);
-            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Oh, 0);
-
-            var smile = (_mouthSmileLeft + _mouthSmileRight) / 2f * _mouthShapeSensitivity;
-            var frown = (_mouthFrownLeft + _mouthFrownRight) / 2f * _mouthShapeSensitivity;
-            var pucker = _mouthPucker * _mouthShapeSensitivity;
-            var funnel = _mouthFunnel * _mouthShapeSensitivity;
-            var shapeTotal = smile + frown + pucker + funnel;
-
-            if (shapeTotal > 1.0f)
-            {
-                smile /= shapeTotal;
-                frown /= shapeTotal;
-                pucker /= shapeTotal;
-                funnel /= shapeTotal;
-            }
-
-            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Happy, 0);
-            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Sad, 0);
-            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Relaxed, 0);
-            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Surprised, 0);
-            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Happy, Mathf.Lerp(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Happy), smile, 1f - _mouthSmoothing));
-            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Sad, Mathf.Lerp(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Sad), frown, 1f - _mouthSmoothing));
-            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Oh, Mathf.Max(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Oh), pucker));
-            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ou, Mathf.Max(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Ou), funnel));
-
-            _mouthInterpolate.UpdateTime(Time.timeAsDouble);
-        }
-
         private void UpdateVRIK()
         {
             if (!_tracker.ActivePoseWorldLandmark) return;
@@ -1180,6 +886,205 @@ namespace PMC
             }
         }
 
+        private void UpdateFinger()
+        {
+            if (!_enableHandTracking) return;
+
+            if (_tracker.ActiveLeftHandWorldLandmark)
+            {
+                var lHandTransform = _animator.GetBoneTransform(HumanBodyBones.LeftHand);
+
+                var lHandUp = UnityUtils.TriangleNormal(
+                                        _tracker.LeftHandWorldLandmarks[(int)HandLandmark.Wrist].Position,
+                                        _tracker.LeftHandWorldLandmarks[(int)HandLandmark.PinkyMcp].Position,
+                                        _tracker.LeftHandWorldLandmarks[(int)HandLandmark.IndexFingerMcp].Position);
+                var lHandForward = (_tracker.LeftHandWorldLandmarks[(int)HandLandmark.Wrist].Position - _tracker.LeftHandWorldLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
+
+                lHandTransform.rotation = UnityUtils.LookRotation(lHandForward, lHandUp) * _inverseLeftHandRotation;
+
+                var invLeftHandWorldRot = Quaternion.Inverse(lHandTransform.rotation);
+
+                ComputeFingerRotation(HumanBodyBones.LeftThumbProximal, HandLandmark.ThumbCmc, invLeftHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.LeftIndexProximal, HandLandmark.IndexFingerMcp, invLeftHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.LeftMiddleProximal, HandLandmark.MiddleFingerMcp, invLeftHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.LeftRingProximal, HandLandmark.RingFingerMcp, invLeftHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.LeftLittleProximal, HandLandmark.PinkyMcp, invLeftHandWorldRot);
+            }
+            else
+            {
+                ResetHandBones(false);
+            }
+
+            if (_tracker.ActiveRightHandWorldLandmark)
+            {
+                var rHandTransform = _animator.GetBoneTransform(HumanBodyBones.RightHand);
+
+                var rHandUp = UnityUtils.TriangleNormal(
+                                        _tracker.RightHandWorldLandmarks[(int)HandLandmark.Wrist].Position,
+                                        _tracker.RightHandWorldLandmarks[(int)HandLandmark.IndexFingerMcp].Position,
+                                        _tracker.RightHandWorldLandmarks[(int)HandLandmark.PinkyMcp].Position);
+                var rHandForward = (_tracker.RightHandWorldLandmarks[(int)HandLandmark.Wrist].Position - _tracker.RightHandWorldLandmarks[(int)HandLandmark.MiddleFingerMcp].Position).normalized;
+
+                rHandTransform.rotation = UnityUtils.LookRotation(rHandForward, rHandUp) * _inverseRightHandRotation;
+
+                var invRightHandWorldRot = Quaternion.Inverse(rHandTransform.rotation);
+
+                ComputeFingerRotation(HumanBodyBones.RightThumbProximal, HandLandmark.ThumbCmc, invRightHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.RightIndexProximal, HandLandmark.IndexFingerMcp, invRightHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.RightMiddleProximal, HandLandmark.MiddleFingerMcp, invRightHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.RightRingProximal, HandLandmark.RingFingerMcp, invRightHandWorldRot);
+                ComputeFingerRotation(HumanBodyBones.RightLittleProximal, HandLandmark.PinkyMcp, invRightHandWorldRot);
+            }
+            else
+            {
+                ResetHandBones(true);
+            }
+        }
+
+        private void UpdateBlink()
+        {
+            if (!_tracker.ActiveFaceBlendShapes) return;
+
+            if (_autoBlink)
+            {
+                if (_blinking)
+                {
+                    _blinkState += Time.deltaTime * 20f;
+
+                    if (_blinkState >= 2.0)
+                    {
+                        _blinking = false;
+                        _blinkState = 0.0f;
+                        _blinkTimer = Time.time;
+                        _nextBlink = Random.Range(1f, 4f);
+                    }
+                }
+                else if (Time.time - _blinkTimer > _nextBlink)
+                {
+                    _blinking = true;
+                }
+
+                var weight = _blinkState <= 1.0 ? _blinkState : 2f - _blinkState;
+
+                _vrm.Runtime.Expression.SetWeight(ExpressionKey.Blink, weight);
+            }
+            else
+            {
+                var targetLeft = CalculateBlinkValueFromARKit(_tracker.Categories[(int)FaceBlendShapes.EyeBlinkLeft].score, _eyeOpenedThreshold, _eyeClosedThreshold);
+                var targetRight = CalculateBlinkValueFromARKit(_tracker.Categories[(int)FaceBlendShapes.EyeBlinkRight].score, _eyeOpenedThreshold, _eyeClosedThreshold);
+
+                var t = _blinkInterpolate.Interpolate();
+                var smoothedLeft = Mathf.Lerp(_lastBlinkLeft, _currentBlinkLeft, t);
+                var smoothedRight = Mathf.Lerp(_lastBlinkRight, _currentBlinkRight, t);
+
+                if (_linkBlinks && !_allowWinking)
+                {
+                    var weight = Mathf.Max(smoothedLeft, smoothedRight);
+
+                    _vrm.Runtime.Expression.SetWeight(ExpressionKey.Blink, weight);
+                }
+                else
+                {
+                    _vrm.Runtime.Expression.SetWeight(ExpressionKey.BlinkLeft, smoothedLeft);
+                    _vrm.Runtime.Expression.SetWeight(ExpressionKey.BlinkRight, smoothedRight);
+                }
+
+                _blinkInterpolate.UpdateTime(Time.timeAsDouble);
+
+                if (_linkBlinks && _allowWinking && Mathf.Abs(targetRight - targetLeft) < _smartWinkThreshold)
+                {
+                    var maxBlink = Mathf.Max(targetLeft, targetRight);
+
+                    targetLeft = maxBlink;
+                    targetRight = maxBlink;
+                }
+
+                _lastBlinkLeft = smoothedLeft;
+                _lastBlinkRight = smoothedRight;
+
+                _currentBlinkLeft = Mathf.Lerp(_currentBlinkLeft, targetLeft, 1f - _blinkSmoothing);
+                _currentBlinkRight = Mathf.Lerp(_currentBlinkRight, targetRight, 1f - _blinkSmoothing);
+            }
+        }
+
+        private void UpdateGaze()
+        {
+            if (!_gazeTracking || !_tracker.ActiveFaceBlendShapes) return;
+
+            var targetLookUp = (_tracker.Categories[(int)FaceBlendShapes.EyeLookUpLeft].score + _tracker.Categories[(int)FaceBlendShapes.EyeLookUpRight].score) / 2f;
+            var targetLookDown = (_tracker.Categories[(int)FaceBlendShapes.EyeLookDownLeft].score + _tracker.Categories[(int)FaceBlendShapes.EyeLookDownRight].score) / 2f;
+            var targetLookLeft = (_tracker.Categories[(int)FaceBlendShapes.EyeLookInLeft].score + _tracker.Categories[(int)FaceBlendShapes.EyeLookOutRight].score) / 2f;
+            var targetLookRight = (_tracker.Categories[(int)FaceBlendShapes.EyeLookOutLeft].score + _tracker.Categories[(int)FaceBlendShapes.EyeLookInRight].score) / 2f;
+
+            var t = _gazeInterpolate.Interpolate();
+
+            var smoothedLookUp = Mathf.Lerp(_lastLookUp, targetLookUp, 1f - _gazeSmoothing);
+            var smoothedLookDown = Mathf.Lerp(_lastLookDown, targetLookDown, 1f - _gazeSmoothing);
+            var smoothedLookLeft = Mathf.Lerp(_lastLookLeft, targetLookLeft, 1f - _gazeSmoothing);
+            var smoothedLookRight = Mathf.Lerp(_lastLookRight, targetLookRight, 1f - _gazeSmoothing);
+
+            _lastLookUp = smoothedLookUp;
+            _lastLookDown = smoothedLookDown;
+            _lastLookLeft = smoothedLookLeft;
+            _lastLookRight = smoothedLookRight;
+
+            _currentLookUp = smoothedLookUp;
+            _currentLookDown = smoothedLookDown;
+            _currentLookLeft = smoothedLookLeft;
+            _currentLookRight = smoothedLookRight;
+
+            _gazeInterpolate.UpdateTime(Time.timeAsDouble);
+
+            if (_leftEyeBone != null && _rightEyeBone != null)
+            {
+                var lookUpDown = _currentLookUp - _currentLookDown;
+                var lookLeftRight = _currentLookRight - _currentLookLeft;
+
+                _vrm.Runtime.LookAt.SetYawPitchManually(_gazeFactor.x * _gazeStrength * lookLeftRight, _gazeFactor.y * _gazeStrength * lookUpDown);
+            }
+        }
+
+        private void UpdateMouth()
+        {
+            if (!_tracker.ActiveFaceBlendShapes) return;
+
+            var t = _mouthInterpolate.Interpolate();
+
+            var mouthOpen = _tracker.Categories[(int)FaceBlendShapes.JawOpen].score * _mouthOpenSensitivity;
+            var au = Mathf.Lerp(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Aa), mouthOpen, 1f - _mouthSmoothing);
+
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Aa, au);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ih, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ou, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ee, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Oh, 0);
+
+            var smile = (_tracker.Categories[(int)FaceBlendShapes.MouthSmileLeft].score + _tracker.Categories[(int)FaceBlendShapes.MouthSmileRight].score) / 2f * _mouthShapeSensitivity;
+            var frown = (_tracker.Categories[(int)FaceBlendShapes.MouthFrownLeft].score + _tracker.Categories[(int)FaceBlendShapes.MouthFrownRight].score) / 2f * _mouthShapeSensitivity;
+            var pucker = _tracker.Categories[(int)FaceBlendShapes.MouthPucker].score * _mouthShapeSensitivity;
+            var funnel = _tracker.Categories[(int)FaceBlendShapes.MouthFunnel].score * _mouthShapeSensitivity;
+            var shapeTotal = smile + frown + pucker + funnel;
+
+            if (shapeTotal > 1.0f)
+            {
+                smile /= shapeTotal;
+                frown /= shapeTotal;
+                pucker /= shapeTotal;
+                funnel /= shapeTotal;
+            }
+
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Happy, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Sad, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Relaxed, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Surprised, 0);
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Happy, Mathf.Lerp(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Happy), smile, 1f - _mouthSmoothing));
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Sad, Mathf.Lerp(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Sad), frown, 1f - _mouthSmoothing));
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Oh, Mathf.Max(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Oh), pucker));
+            _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ou, Mathf.Max(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Ou), funnel));
+
+            _mouthInterpolate.UpdateTime(Time.timeAsDouble);
+        }
+
         private void ResetHandBones(bool isRightHand = false)
         {
             var handBones = isRightHand ?
@@ -1279,11 +1184,5 @@ namespace PMC
 
             return 0f;
         }
-    }
-
-    public enum IKType
-    {
-        [InspectorName("VR IK")] VRIK,
-        [InspectorName("Full Body Biped IK")] FBBIK,
     }
 }
