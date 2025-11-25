@@ -1236,7 +1236,7 @@ VideoPlayer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 126484966}
   m_Enabled: 1
-  m_VideoClip: {fileID: 32900000, guid: cedbc64d5fed98640abd259794edb11b, type: 3}
+  m_VideoClip: {fileID: 32900000, guid: 15588459e6605c2489744026931a299e, type: 3}
   m_TargetCameraAlpha: 1
   m_TargetCamera3DLayout: 0
   m_TargetCamera: {fileID: 0}
@@ -1250,14 +1250,12 @@ VideoPlayer:
   m_TimeUpdateMode: 1
   m_PlaybackSpeed: 1
   m_AudioOutputMode: 0
-  m_TargetAudioSources:
-  - {fileID: 0}
-  m_DirectAudioVolumes:
-  - 1
+  m_TargetAudioSources: []
+  m_DirectAudioVolumes: []
   m_Url: 
-  m_EnabledAudioTracks: 01
-  m_DirectAudioMutes: 00
-  m_ControlledAudioTrackCount: 1
+  m_EnabledAudioTracks: 
+  m_DirectAudioMutes: 
+  m_ControlledAudioTrackCount: 0
   m_PlayOnAwake: 1
   m_SkipOnDrop: 1
   m_Looping: 0
@@ -1491,7 +1489,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &161348888
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2775,6 +2773,7 @@ GameObject:
   - component: {fileID: 337034883}
   - component: {fileID: 337034882}
   - component: {fileID: 337034881}
+  - component: {fileID: 337034884}
   m_Layer: 0
   m_Name: Plane
   m_TagString: Untagged
@@ -2847,6 +2846,28 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!64 &337034884
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 337034879}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!21 &347449064
 Material:
   serializedVersion: 8
@@ -3572,21 +3593,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d898f8546afc74d4c978a86c32ff521c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _imageSource: {fileID: 126484967}
-  _imageReadMode: 1
-  _modelAssetPath: holistic_landmarker.bytes
-  _minFaceDetectionConfidence: 0.75
-  _minFaceSuppressionThreshold: 0.75
-  _minFaceLandmarksConfidence: 0.75
-  _minPoseDetectionConfidence: 0.75
-  _minPoseSuppressionThreshold: 0.75
-  _minPoseLandmarksConfidence: 0.75
-  _minHandLandmarksConfidence: 0.75
-  _outputFaceBlendshapes: 1
-  _outputSegmentationMask: 0
-  _preview: {fileID: 570078766}
-  _delegate: 0
-  _runningMode: 2
+  ImageSource: {fileID: 126484967}
+  ModelAsset: {fileID: 4900000, guid: f62bbb6da0e10ca46bd5884677255faa, type: 3}
+  ImageReadMode: 1
+  MinFaceDetectionConfidence: 0.5
+  MinFaceSuppressionThreshold: 0.5
+  MinFaceLandmarksConfidence: 0.5
+  MinPoseDetectionConfidence: 0.5
+  MinPoseSuppressionThreshold: 0.5
+  MinPoseLandmarksConfidence: 0.5
+  MinHandLandmarksConfidence: 0.5
+  OutputFaceBlendshapes: 1
+  OutputSegmentationMask: 0
+  _enableKalmanFilter: 1
+  _timeInterval: 0.45
+  _noise: 0.4
+  _enableOneEuroFilter: 1
+  _filterFrequency: 120
+  _filterMinCutoff: 2
+  _filterBeta: 0.5
+  _filterDcutoff: 1
+  _enableGlobalPoseFilter: 1
+  _globalPoseFilterFrequency: 120
+  _globalPoseFilterMinCutoff: 1
+  _globalPoseFilterBeta: 0.1
+  _globalPoseFilterDcutoff: 1
 --- !u!114 &570078766
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3602,10 +3633,8 @@ MonoBehaviour:
   _landmarkRadius: 0.01
   _leftLandmarkColor: {r: 1, g: 0.5, b: 0, a: 1}
   _rightLandmarkColor: {r: 0, g: 1, b: 1, a: 1}
-  _centerLandmarkColor: {r: 1, g: 0, b: 0, a: 1}
   _connectionColor: {r: 1, g: 1, b: 1, a: 1}
-  _landmarkPosition: {x: 1, y: 1, z: 0}
-  _landmarkScale: {x: 1, y: 1, z: -1}
+  LandmarkPosition: {x: 1, y: 1, z: 0}
 --- !u!21 &574387238
 Material:
   serializedVersion: 8
@@ -5208,53 +5237,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 85e41428a85668448a40736e9d44f2a6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _tracker: {fileID: 570078765}
-  _IKType: 0
-  _enableTwistRelaxer: 1
-  _enableMovement: 0
-  _autoWeight: 1
-  _fingerResetSpeed: 5
-  _weightSmoothingSpeed: 10
-  _targetRotationSmoothSpeed: 20
-  _landmarkScale: {x: 1, y: 1, z: -1}
-  _handRotationOffset: {x: 0, y: 90, z: 0}
-  _movementScale: {x: 3.4, y: 2, z: 0}
-  _enableKalmanFilter: 1
-  _timeInterval: 0.3
-  _noise: 0.4
-  _enableOneEuroFilter: 1
-  _filterFrequency: 120
-  _filterMinCutoff: 2
-  _filterBeta: 0.3
-  _filterDcutoff: 1
-  _leftEyeBone: {fileID: 913144550}
-  _rightEyeBone: {fileID: 877330133}
-  _autoBlink: 0
-  _linkBlinks: 1
-  _allowWinking: 1
-  _gazeTracking: 1
-  _eyeClosedThreshold: 0.7
-  _eyeOpenedThreshold: 0.2
-  _smartWinkThreshold: 0.85
-  _blinkSmoothing: 0.75
-  _gazeSmoothing: 0.6
-  _gazeStrength: 50
-  _gazeFactor: {x: -1, y: 1}
-  _mouthOpenSensitivity: 1
-  _mouthShapeSensitivity: 1
-  _mouthSmoothing: 0.6
---- !u!4 &877330133 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -4157275529162673383, guid: 9ac6defd943a6ab4f926be726b6a8ef7,
-    type: 3}
-  m_PrefabInstance: {fileID: 1187513254}
-  m_PrefabAsset: {fileID: 0}
---- !u!4 &913144550 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -1912380334456176920, guid: 9ac6defd943a6ab4f926be726b6a8ef7,
-    type: 3}
-  m_PrefabInstance: {fileID: 1187513254}
-  m_PrefabAsset: {fileID: 0}
+  Tracker: {fileID: 570078765}
+  IKType: 0
+  EnableTwistRelaxer: 1
+  EnableMovement: 1
+  AutoWeight: 1
+  WeightSmoothingSpeed: 10
+  TargetRotationSmoothSpeed: 20
+  EnableHandTracking: 1
+  FingerResetSpeed: 5
+  HandRotationOffset: {x: 0, y: 90, z: 0}
+  EnableBlink: 1
+  AutoBlink: 0
+  LinkBlinks: 1
+  AllowWinking: 1
+  EyeClosedThreshold: 0.65
+  EyeOpenedThreshold: 0.15
+  SmartWinkThreshold: 0.85
+  BlinkSmoothing: 0.75
+  EnableGaze: 1
+  GazeSmoothing: 0.6
+  GazeStrength: 1
+  EnableMouth: 1
+  MouthOpenSensitivity: 1
+  MouthShapeSensitivity: 1
+  MouthSmoothing: 0.6
 --- !u!21 &1012511374
 Material:
   serializedVersion: 8
@@ -6583,6 +6590,16 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: Vita
+      objectReference: {fileID: 0}
+    - target: {fileID: -1728013695380148634, guid: 9ac6defd943a6ab4f926be726b6a8ef7,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3006928552751935236, guid: 9ac6defd943a6ab4f926be726b6a8ef7,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5159078012444724336, guid: 9ac6defd943a6ab4f926be726b6a8ef7,
         type: 3}
