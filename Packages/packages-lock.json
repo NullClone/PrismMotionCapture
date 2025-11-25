@@ -1,14 +1,13 @@
 {
   "dependencies": {
     "com.github.homuler.mediapipe": {
-      "version": "https://github.com/homuler/MediaPipeUnityPlugin.git?path=/Packages/com.github.homuler.mediapipe",
+      "version": "file:com.github.homuler.mediapipe",
       "depth": 0,
-      "source": "git",
+      "source": "embedded",
       "dependencies": {
         "com.unity.ugui": "1.0.0",
         "com.unity.test-framework": "1.0.0"
-      },
-      "hash": "cf4c11d8eef724fe24111b7cd795d55ba490aeec"
+      }
     },
     "com.unity.burst": {
       "version": "1.8.12",
