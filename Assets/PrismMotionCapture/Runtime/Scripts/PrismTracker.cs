@@ -37,6 +37,9 @@ namespace PMC
         public bool OutputFaceBlendshapes = true;
         public bool OutputSegmentationMask = false;
 
+        public bool FlipHorizontally = false;
+        public bool FlipVertically = false;
+
         public Vector3 LandmarkScale = Vector3.one;
         public Vector3 MovementScale = Vector3.one;
 
@@ -218,7 +221,7 @@ namespace PMC
                             {
                                 yield return waitForEndOfFrame;
 
-                                textureFrame.ReadTextureOnCPU(ImageSource.Texture);
+                                textureFrame.ReadTextureOnCPU(ImageSource.Texture, FlipHorizontally, FlipVertically);
                                 image = textureFrame.BuildCPUImage();
                                 textureFrame.Release();
 
@@ -226,7 +229,7 @@ namespace PMC
                             }
                         case ImageReadMode.CPUAsync:
                             {
-                                req = textureFrame.ReadTextureAsync(ImageSource.Texture);
+                                req = textureFrame.ReadTextureAsync(ImageSource.Texture, FlipHorizontally, FlipVertically);
 
                                 yield return waitUntilReqDone;
 
@@ -250,7 +253,7 @@ namespace PMC
                                     throw new Exception("ImageReadMode.GPU is not supported");
                                 }
 
-                                textureFrame.ReadTextureOnGPU(ImageSource.Texture);
+                                textureFrame.ReadTextureOnGPU(ImageSource.Texture, FlipHorizontally, FlipVertically);
                                 image = textureFrame.BuildGPUImage(glContext);
 
                                 yield return waitForEndOfFrame;

@@ -18,6 +18,8 @@ namespace PMC.Editor
         private SerializedProperty MinHandLandmarksConfidence;
         private SerializedProperty OutputFaceBlendshapes;
         private SerializedProperty OutputSegmentationMask;
+        private SerializedProperty FlipHorizontally;
+        private SerializedProperty FlipVertically;
         private SerializedProperty LandmarkScale;
         private SerializedProperty MovementScale;
         private SerializedProperty _enableKalmanFilter;
@@ -51,6 +53,8 @@ namespace PMC.Editor
             MinHandLandmarksConfidence = serializedObject.FindProperty(nameof(MinHandLandmarksConfidence));
             OutputFaceBlendshapes = serializedObject.FindProperty(nameof(OutputFaceBlendshapes));
             OutputSegmentationMask = serializedObject.FindProperty(nameof(OutputSegmentationMask));
+            FlipHorizontally = serializedObject.FindProperty(nameof(FlipHorizontally));
+            FlipVertically = serializedObject.FindProperty(nameof(FlipVertically));
             LandmarkScale = serializedObject.FindProperty(nameof(LandmarkScale));
             MovementScale = serializedObject.FindProperty(nameof(MovementScale));
             _enableKalmanFilter = serializedObject.FindProperty(nameof(_enableKalmanFilter));
@@ -97,6 +101,9 @@ namespace PMC.Editor
                     EditorGUILayout.Space();
                     EditorGUILayout.PropertyField(OutputFaceBlendshapes, new GUIContent("Enable Face Blendshapes"));
                     EditorGUILayout.PropertyField(OutputSegmentationMask, new GUIContent("Enable Segmentation Mask"));
+                    EditorGUILayout.Space();
+                    EditorGUILayout.PropertyField(FlipHorizontally);
+                    EditorGUILayout.PropertyField(FlipVertically);
                     EditorGUILayout.EndVertical();
                 }
             }
