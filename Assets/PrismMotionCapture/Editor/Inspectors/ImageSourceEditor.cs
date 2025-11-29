@@ -8,177 +8,146 @@ namespace PMC.Editor
     [CustomEditor(typeof(ImageSource))]
     sealed class ImageSourceEditor : UnityEditor.Editor
     {
-        // Properties
+        private SerializedProperty SourceType;
+        private SerializedProperty Texture2D;
+        private SerializedProperty VideoPlayer;
+        private SerializedProperty WebcamName;
+        private SerializedProperty WebcamFrameRate;
+        private SerializedProperty WebcamResolution;
+        private SerializedProperty RenderMode;
+        private SerializedProperty RenderTexture;
+        private SerializedProperty Renderer;
+        private SerializedProperty UseAutoSelect;
+        private SerializedProperty PropertyName;
+        private SerializedProperty RawImage;
 
-        private SerializedProperty _sourceType;
-        private SerializedProperty _isFlipX;
-        private SerializedProperty _texture;
-        private SerializedProperty _videoPlayer;
-        private SerializedProperty _webcamName;
-        private SerializedProperty _webcamFrameRate;
-        private SerializedProperty _webcamResolution;
-        private SerializedProperty _renderMode;
-        private SerializedProperty _renderTexture;
-        private SerializedProperty _renderer;
-        private SerializedProperty _useAutoSelect;
-        private SerializedProperty _propertyName;
-        private SerializedProperty _rawImage;
-
-
-        // Methods
+        private void OnEnable()
+        {
+            SourceType = serializedObject.FindProperty(nameof(SourceType));
+            Texture2D = serializedObject.FindProperty(nameof(Texture2D));
+            VideoPlayer = serializedObject.FindProperty(nameof(VideoPlayer));
+            WebcamName = serializedObject.FindProperty(nameof(WebcamName));
+            WebcamFrameRate = serializedObject.FindProperty(nameof(WebcamFrameRate));
+            WebcamResolution = serializedObject.FindProperty(nameof(WebcamResolution));
+            RenderMode = serializedObject.FindProperty(nameof(RenderMode));
+            RenderTexture = serializedObject.FindProperty(nameof(RenderTexture));
+            Renderer = serializedObject.FindProperty(nameof(Renderer));
+            UseAutoSelect = serializedObject.FindProperty(nameof(UseAutoSelect));
+            PropertyName = serializedObject.FindProperty(nameof(PropertyName));
+            RawImage = serializedObject.FindProperty(nameof(RawImage));
+        }
 
         public override void OnInspectorGUI()
         {
-            var instance = (ImageSource)target;
-
             serializedObject.Update();
 
-            EditorGUI.BeginDisabledGroup(Application.isPlaying);
+            EditorGUILayout.PropertyField(SourceType);
 
-            EditorGUILayout.PropertyField(_sourceType);
-
-            EditorGUI.indentLevel++;
-
-            var sourceType = (SourceType)_sourceType.enumValueIndex;
-
-            switch (sourceType)
+            using (new EditorGUI.IndentLevelScope())
             {
-                case SourceType.Texture:
-                    {
-                        EditorGUILayout.PropertyField(_texture);
-                        EditorGUILayout.PropertyField(_isFlipX);
-
-                        break;
-                    }
-                case SourceType.Video:
-                    {
-                        EditorGUILayout.PropertyField(_videoPlayer);
-                        EditorGUILayout.PropertyField(_isFlipX);
-
-                        break;
-                    }
-                case SourceType.Webcam:
-                    {
-                        EditorGUILayout.BeginHorizontal();
-
-                        EditorGUI.BeginDisabledGroup(true);
-
-                        EditorGUILayout.PropertyField(_webcamName, new GUIContent("Device Name"));
-
-                        EditorGUI.EndDisabledGroup();
-
-                        var rect = EditorGUILayout.GetControlRect(false, GUILayout.Width(60));
-
-                        if (EditorGUI.DropdownButton(rect, new GUIContent("Select"), FocusType.Keyboard))
+                switch ((SourceType)SourceType.enumValueIndex)
+                {
+                    case 0:
                         {
-                            var menu = new GenericMenu();
+                            EditorGUILayout.PropertyField(Texture2D);
 
-                            foreach (var device in WebCamTexture.devices)
+                            break;
+                        }
+                    case (SourceType)1:
+                        {
+                            EditorGUILayout.PropertyField(VideoPlayer);
+
+                            break;
+                        }
+                    case (SourceType)2:
+                        {
+                            EditorGUILayout.BeginHorizontal();
+
+                            using (new EditorGUI.DisabledGroupScope(true))
                             {
-                                menu.AddItem(new GUIContent(device.name), false,
-                                    () =>
-                                    {
-                                        serializedObject.Update();
-
-                                        _webcamName.stringValue = device.name;
-
-                                        serializedObject.ApplyModifiedProperties();
-                                    });
+                                EditorGUILayout.PropertyField(WebcamName, new GUIContent("Device Name"));
                             }
 
-                            menu.DropDown(rect);
+                            var rect = EditorGUILayout.GetControlRect(false, GUILayout.Width(60));
+
+                            if (EditorGUI.DropdownButton(rect, new GUIContent("Select"), FocusType.Keyboard))
+                            {
+                                var menu = new GenericMenu();
+
+                                foreach (var device in WebCamTexture.devices)
+                                {
+                                    menu.AddItem(new GUIContent(device.name), false,
+                                        () =>
+                                        {
+                                            serializedObject.Update();
+
+                                            WebcamName.stringValue = device.name;
+
+                                            serializedObject.ApplyModifiedProperties();
+                                        });
+                                }
+
+                                menu.DropDown(rect);
+                            }
+
+                            EditorGUILayout.EndHorizontal();
+                            EditorGUILayout.PropertyField(WebcamFrameRate, new GUIContent("Frame Rate"));
+                            EditorGUILayout.PropertyField(WebcamResolution, new GUIContent("Resolution"));
+
+                            break;
                         }
-
-                        EditorGUILayout.EndHorizontal();
-
-                        EditorGUILayout.PropertyField(_webcamFrameRate, new GUIContent("Frame Rate"));
-                        EditorGUILayout.PropertyField(_webcamResolution, new GUIContent("Resolution"));
-                        EditorGUILayout.PropertyField(_isFlipX);
-
-                        break;
-                    }
+                }
             }
 
-            EditorGUI.indentLevel--;
-
-            EditorGUI.EndDisabledGroup();
-
             EditorGUILayout.Space();
-            EditorGUILayout.PropertyField(_renderMode);
+            EditorGUILayout.PropertyField(RenderMode);
 
-            var renderMode = (RenderMode)_renderMode.enumValueIndex;
-
-            switch (renderMode)
+            switch ((RenderMode)RenderMode.enumValueIndex)
             {
-                case RenderMode.RenderTexture:
+                case (RenderMode)1:
                     {
-                        EditorGUILayout.PropertyField(_renderTexture);
+                        EditorGUILayout.PropertyField(RenderTexture);
 
                         break;
                     }
-                case RenderMode.Renderer:
+                case (RenderMode)2:
                     {
-                        EditorGUILayout.PropertyField(_renderer);
+                        EditorGUILayout.PropertyField(Renderer);
 
-                        if (instance.Renderer == null) break;
+                        var renderer = (Renderer)Renderer.objectReferenceValue;
 
-                        var material = instance.Renderer.sharedMaterial;
+                        if (renderer == null) break;
 
-                        if (material)
+                        var material = renderer.sharedMaterial;
+
+                        if (material == null) break;
+
+                        EditorGUILayout.PropertyField(UseAutoSelect);
+
+                        using (new EditorGUI.DisabledGroupScope(UseAutoSelect.boolValue))
                         {
-                            EditorGUILayout.PropertyField(_useAutoSelect);
-
-                            EditorGUI.indentLevel++;
-
-                            EditorGUI.BeginDisabledGroup(_useAutoSelect.boolValue);
-
                             var names = material.GetPropertyNames(MaterialPropertyType.Texture);
 
-                            var selectedIndex = Array.IndexOf(names, _propertyName.stringValue);
+                            var selectedIndex = Array.IndexOf(names, PropertyName.stringValue);
 
-                            if (selectedIndex < 0)
-                            {
-                                selectedIndex = 0;
-                            }
+                            if (selectedIndex < 0) selectedIndex = 0;
 
                             var index = EditorGUILayout.Popup("Material Property", selectedIndex, names);
 
-                            _propertyName.stringValue = names[index];
-
-                            EditorGUI.EndDisabledGroup();
-
-                            EditorGUI.indentLevel--;
+                            PropertyName.stringValue = names[index];
                         }
 
                         break;
                     }
-                case RenderMode.RawImage:
+                case (RenderMode)3:
                     {
-                        EditorGUILayout.PropertyField(_rawImage);
+                        EditorGUILayout.PropertyField(RawImage);
 
                         break;
                     }
             }
 
             serializedObject.ApplyModifiedProperties();
-        }
-
-
-        private void OnEnable()
-        {
-            _sourceType = serializedObject.FindProperty("_sourceType");
-            _isFlipX = serializedObject.FindProperty("_isFlipX");
-            _texture = serializedObject.FindProperty("_texture");
-            _videoPlayer = serializedObject.FindProperty("_videoPlayer");
-            _webcamName = serializedObject.FindProperty("_webcamName");
-            _webcamFrameRate = serializedObject.FindProperty("_webcamFrameRate");
-            _webcamResolution = serializedObject.FindProperty("_webcamResolution");
-            _renderMode = serializedObject.FindProperty("_renderMode");
-            _renderTexture = serializedObject.FindProperty("_renderTexture");
-            _renderer = serializedObject.FindProperty("_renderer");
-            _useAutoSelect = serializedObject.FindProperty("_useAutoSelect");
-            _propertyName = serializedObject.FindProperty("_propertyName");
-            _rawImage = serializedObject.FindProperty("_rawImage");
         }
     }
 }

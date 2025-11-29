@@ -7,60 +7,57 @@ namespace PMC
     [AddComponentMenu("Prism Motion Capture/Image Source")]
     public sealed class ImageSource : MonoBehaviour
     {
-        // Properties
-
-        public RenderTexture Texture => _buffer;
-
-        public Renderer Renderer => _renderer;
-
-        public Vector2 Resolution => _resolution;
-
-
         // Fields
 
-        [SerializeField] private SourceType _sourceType = SourceType.Texture;
-        [SerializeField] private bool _isFlipX = false;
-        [SerializeField] private Texture2D _texture;
-        [SerializeField] private VideoPlayer _videoPlayer;
-        [SerializeField] private string _webcamName = "";
-        [SerializeField] private int _webcamFrameRate = 30;
-        [SerializeField] private Vector2Int _webcamResolution = new(1920, 1080);
-        [SerializeField] private RenderMode _renderMode = RenderMode.None;
-        [SerializeField] private RenderTexture _renderTexture;
-        [SerializeField] private Renderer _renderer;
-        [SerializeField] private bool _useAutoSelect = true;
-        [SerializeField] private string _propertyName;
-        [SerializeField] private RawImage _rawImage;
+        public SourceType SourceType = SourceType.Texture;
+        public Texture2D Texture2D;
+        public VideoPlayer VideoPlayer;
+        public string WebcamName;
+        public int WebcamFrameRate = 30;
+        public Vector2Int WebcamResolution = new(1920, 1080);
+        public RenderMode RenderMode = RenderMode.None;
+        public RenderTexture RenderTexture;
+        public Renderer Renderer;
+        public bool UseAutoSelect = true;
+        public string PropertyName;
+        public RawImage RawImage;
 
         private WebCamTexture _webcam;
         private RenderTexture _buffer;
         private Vector2Int _resolution;
 
 
+        // Properties
+
+        public RenderTexture Texture => _buffer;
+
+        public Vector2 Resolution => _resolution;
+
+
         // Methods
 
         private void Awake()
         {
-            switch (_sourceType)
+            switch (SourceType)
             {
                 case SourceType.Texture:
                     {
-                        if (_texture)
+                        if (Texture2D)
                         {
-                            _resolution = new Vector2Int(_texture.width, _texture.height);
+                            _resolution = new Vector2Int(Texture2D.width, Texture2D.height);
 
                             _buffer = new RenderTexture(_resolution.x, _resolution.y, 0);
 
-                            TextureBlit(_texture, _buffer, _isFlipX);
+                            TextureBlit(Texture2D, _buffer);
                         }
 
                         break;
                     }
                 case SourceType.Video:
                     {
-                        if (_videoPlayer)
+                        if (VideoPlayer)
                         {
-                            _resolution = new Vector2Int((int)_videoPlayer.width, (int)_videoPlayer.height);
+                            _resolution = new Vector2Int((int)VideoPlayer.width, (int)VideoPlayer.height);
 
                             _buffer = new RenderTexture(_resolution.x, _resolution.y, 0);
                         }
@@ -69,34 +66,44 @@ namespace PMC
                     }
                 case SourceType.Webcam:
                     {
-                        _resolution = _webcamResolution;
+                        _resolution = WebcamResolution;
 
                         _buffer = new RenderTexture(_resolution.x, _resolution.y, 0);
 
-                        _webcam = new WebCamTexture(
-                            _webcamName,
-                            _resolution.x,
-                            _resolution.y,
-                            _webcamFrameRate);
+                        var isFound = false;
 
+                        foreach (var device in WebCamTexture.devices)
+                        {
+                            if (device.name == WebcamName)
+                            {
+                                isFound = true;
+                            }
+                        }
+
+                        if (!isFound)
+                        {
+                            WebcamName = WebCamTexture.devices[0].name;
+                        }
+
+                        _webcam = new WebCamTexture(WebcamName, _resolution.x, _resolution.y, WebcamFrameRate);
                         _webcam.Play();
 
                         break;
                     }
             }
 
-            switch (_renderMode)
+            switch (RenderMode)
             {
                 case RenderMode.Renderer:
                     {
                         var aspect = (float)_resolution.x / _resolution.y;
 
-                        if (_renderer.transform.localScale.x / _renderer.transform.localScale.y != aspect)
+                        if (Renderer.transform.localScale.x / Renderer.transform.localScale.y != aspect)
                         {
-                            _renderer.transform.localScale = new Vector3(
-                            _renderer.transform.localScale.x * aspect,
-                            _renderer.transform.localScale.y,
-                            _renderer.transform.localScale.z);
+                            Renderer.transform.localScale = new Vector3(
+                                Renderer.transform.localScale.x * aspect,
+                                Renderer.transform.localScale.y,
+                                Renderer.transform.localScale.z);
                         }
 
                         break;
@@ -105,12 +112,12 @@ namespace PMC
                     {
                         var aspect = (float)_resolution.x / _resolution.y;
 
-                        if (_rawImage.rectTransform.localScale.x / _rawImage.rectTransform.localScale.y != aspect)
+                        if (RawImage.rectTransform.localScale.x / RawImage.rectTransform.localScale.y != aspect)
                         {
-                            _rawImage.rectTransform.localScale = new Vector3(
-                            _rawImage.rectTransform.localScale.x * aspect,
-                            _rawImage.rectTransform.localScale.y,
-                            _rawImage.rectTransform.localScale.z);
+                            RawImage.rectTransform.localScale = new Vector3(
+                                RawImage.rectTransform.localScale.x * aspect,
+                                RawImage.rectTransform.localScale.y,
+                                RawImage.rectTransform.localScale.z);
                         }
 
                         break;
@@ -120,13 +127,13 @@ namespace PMC
 
         private void Update()
         {
-            switch (_sourceType)
+            switch (SourceType)
             {
                 case SourceType.Video:
                     {
-                        if (_videoPlayer && _videoPlayer.texture)
+                        if (VideoPlayer && VideoPlayer.texture)
                         {
-                            TextureBlit(_videoPlayer.texture, _buffer, _isFlipX);
+                            TextureBlit(VideoPlayer.texture, _buffer);
                         }
 
                         break;
@@ -135,35 +142,35 @@ namespace PMC
                     {
                         if (_webcam && _webcam.didUpdateThisFrame)
                         {
-                            TextureBlit(_webcam, _buffer, _isFlipX);
+                            TextureBlit(_webcam, _buffer);
                         }
 
                         break;
                     }
             }
 
-            switch (_renderMode)
+            switch (RenderMode)
             {
                 case RenderMode.RenderTexture:
                     {
-                        if (_renderTexture)
+                        if (RenderTexture)
                         {
-                            _renderTexture = _buffer;
+                            RenderTexture = _buffer;
                         }
 
                         break;
                     }
                 case RenderMode.Renderer:
                     {
-                        if (_renderer && _renderer.material)
+                        if (Renderer && Renderer.material)
                         {
-                            if (_useAutoSelect)
+                            if (UseAutoSelect)
                             {
-                                _renderer.material.mainTexture = _buffer;
+                                Renderer.material.mainTexture = _buffer;
                             }
                             else
                             {
-                                _renderer.material.SetTexture(_propertyName, _buffer);
+                                Renderer.material.SetTexture(PropertyName, _buffer);
                             }
                         }
 
@@ -171,9 +178,9 @@ namespace PMC
                     }
                 case RenderMode.RawImage:
                     {
-                        if (_rawImage && _rawImage.material)
+                        if (RawImage && RawImage.material)
                         {
-                            _rawImage.texture = _buffer;
+                            RawImage.texture = _buffer;
                         }
 
                         break;
@@ -198,7 +205,8 @@ namespace PMC
             }
         }
 
-        private void TextureBlit(Texture srcTexture, RenderTexture dstTexture, bool isFlipX = false)
+
+        private static void TextureBlit(Texture srcTexture, RenderTexture dstTexture)
         {
             if (srcTexture == null || dstTexture == null) return;
 
@@ -206,7 +214,6 @@ namespace PMC
             var aspect2 = (float)dstTexture.width / dstTexture.height;
 
             var scale = Vector2.Min(Vector2.one, new Vector2(aspect2 / aspect1, aspect1 / aspect2));
-            if (isFlipX) scale.x *= -1;
 
             var offset = (Vector2.one - scale) / 2;
 
