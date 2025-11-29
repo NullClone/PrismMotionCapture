@@ -3,9 +3,7 @@ using Mediapipe.Tasks.Core;
 using Mediapipe.Tasks.Vision.HolisticLandmarker;
 using Mediapipe.Unity;
 using Mediapipe.Unity.Experimental;
-using OpenCVForUnity.Calib3dModule;
-using OpenCVForUnity.CoreModule;
-using OpenCVForUnity.UnityIntegration;
+using OpenCvSharp;
 using PMC.Utilities;
 using System;
 using System.Collections;
@@ -39,6 +37,9 @@ namespace PMC
         public bool OutputFaceBlendshapes = true;
         public bool OutputSegmentationMask = false;
 
+        public Vector3 LandmarkScale = Vector3.one;
+        public Vector3 MovementScale = Vector3.one;
+
         [SerializeField] private bool _enableKalmanFilter = true;
         [SerializeField] private float _timeInterval = 0.45f;
         [SerializeField] private float _noise = 0.4f;
@@ -53,8 +54,6 @@ namespace PMC
         [SerializeField] private float _globalPoseFilterBeta = 0.1f;
         [SerializeField] private float _globalPoseFilterDcutoff = 1f;
 
-        //public Vector3 LandmarkScale = Vector3.one;
-
         private HolisticLandmarker _holisticLandmarker;
         private TextureFramePool _textureFramePool;
         private Stopwatch _stopwatch;
@@ -62,9 +61,7 @@ namespace PMC
         private double _fx, _fy, _cx, _cy;
 
         private Mat _camMatrix;
-        private MatOfDouble _distCoeffs;
-        private MatOfPoint3f _objectPoints;
-        private MatOfPoint2f _imagePoints;
+        private Mat _distCoeffs;
         private Mat _rvec;
         private Mat _tvec;
         private Mat _rotationMatrix;
@@ -87,8 +84,8 @@ namespace PMC
         private readonly KalmanFilter[] _kalmanFilters = new KalmanFilter[PoseLandmarkCount];
         private readonly OneEuroFilter<Vector3>[] _oneEuroFilters = new OneEuroFilter<Vector3>[PoseLandmarkCount];
 
-        private readonly List<Point3> _objectPointsList = new();
-        private readonly List<Point> _imagePointsList = new();
+        private readonly List<Point3f> _objectPointsList = new();
+        private readonly List<Point2f> _imagePointsList = new();
 
         private readonly int[] _pnpLandmarkIndices = new int[]
         {
@@ -190,44 +187,7 @@ namespace PMC
 
             _stopwatch = Stopwatch.StartNew();
 
-
-            foreach (var landmark in PoseWorldLandmarks)
-            {
-                if (_enableKalmanFilter)
-                {
-                    landmark.KalmanFilter = new KalmanFilter();
-                    landmark.KalmanFilter.SetParameter(_timeInterval, _noise);
-                    landmark.KalmanFilter.Predict();
-                }
-
-                if (_enableOneEuroFilter)
-                {
-                    landmark.OneEuroFilter = new OneEuroFilter<Vector3>(_filterFrequency, _filterMinCutoff, _filterBeta, _filterDcutoff);
-                }
-            }
-
-            if (_enableKalmanFilter)
-            {
-                for (int i = 0; i < _kalmanFilters.Length; i++)
-                {
-                    _kalmanFilters[i] = new KalmanFilter();
-                    _kalmanFilters[i].SetParameter(_timeInterval, _noise);
-                    _kalmanFilters[i].Predict();
-                }
-            }
-
-            if (_enableOneEuroFilter)
-            {
-                for (int i = 0; i < _kalmanFilters.Length; i++)
-                {
-                    _oneEuroFilters[i] = new OneEuroFilter<Vector3>(_filterFrequency, _filterMinCutoff, _filterBeta, _filterDcutoff);
-                }
-            }
-
-            _globalAvatarPositionOneEuroFilter = new OneEuroFilter<Vector3>(_globalPoseFilterFrequency, _globalPoseFilterMinCutoff, _globalPoseFilterBeta, _globalPoseFilterDcutoff);
-            _globalAvatarRotationOneEuroFilter = new OneEuroFilter<Quaternion>(_globalPoseFilterFrequency, _globalPoseFilterMinCutoff, _globalPoseFilterBeta, _globalPoseFilterDcutoff);
-
-
+            InitializeFilter();
             InitializePnP();
 
             _initialized = true;
@@ -339,13 +299,50 @@ namespace PMC
 
             _camMatrix?.Dispose();
             _distCoeffs?.Dispose();
-            _objectPoints?.Dispose();
-            _imagePoints?.Dispose();
             _rvec?.Dispose();
             _tvec?.Dispose();
             _rotationMatrix?.Dispose();
             _pnpObjectPointMat?.Dispose();
             _pnpCamSpacePointMat?.Dispose();
+        }
+
+        private void InitializeFilter()
+        {
+            foreach (var landmark in PoseWorldLandmarks)
+            {
+                if (_enableKalmanFilter)
+                {
+                    landmark.KalmanFilter = new KalmanFilter();
+                    landmark.KalmanFilter.SetParameter(_timeInterval, _noise);
+                    landmark.KalmanFilter.Predict();
+                }
+
+                if (_enableOneEuroFilter)
+                {
+                    landmark.OneEuroFilter = new OneEuroFilter<Vector3>(_filterFrequency, _filterMinCutoff, _filterBeta, _filterDcutoff);
+                }
+            }
+
+            if (_enableKalmanFilter)
+            {
+                for (int i = 0; i < _kalmanFilters.Length; i++)
+                {
+                    _kalmanFilters[i] = new KalmanFilter();
+                    _kalmanFilters[i].SetParameter(_timeInterval, _noise);
+                    _kalmanFilters[i].Predict();
+                }
+            }
+
+            if (_enableOneEuroFilter)
+            {
+                for (int i = 0; i < _kalmanFilters.Length; i++)
+                {
+                    _oneEuroFilters[i] = new OneEuroFilter<Vector3>(_filterFrequency, _filterMinCutoff, _filterBeta, _filterDcutoff);
+                }
+            }
+
+            _globalAvatarPositionOneEuroFilter = new OneEuroFilter<Vector3>(_globalPoseFilterFrequency, _globalPoseFilterMinCutoff, _globalPoseFilterBeta, _globalPoseFilterDcutoff);
+            _globalAvatarRotationOneEuroFilter = new OneEuroFilter<Quaternion>(_globalPoseFilterFrequency, _globalPoseFilterMinCutoff, _globalPoseFilterBeta, _globalPoseFilterDcutoff);
         }
 
         private void InitializePnP()
@@ -356,25 +353,25 @@ namespace PMC
             _cx = ImageSource.Resolution.x / 2f;
             _cy = ImageSource.Resolution.y / 2f;
 
-            _camMatrix = new Mat(3, 3, CvType.CV_64FC1);
-            _camMatrix.put(0, 0, _fx);
-            _camMatrix.put(0, 1, 0);
-            _camMatrix.put(0, 2, _cx);
-            _camMatrix.put(1, 0, 0);
-            _camMatrix.put(1, 1, _fy);
-            _camMatrix.put(1, 2, _cy);
-            _camMatrix.put(2, 0, 0);
-            _camMatrix.put(2, 1, 0);
-            _camMatrix.put(2, 2, 1.0f);
+            _camMatrix = new Mat(3, 3, MatType.CV_64FC1);
+            _camMatrix.Set(0, 0, _fx);
+            _camMatrix.Set(0, 1, 0d);
+            _camMatrix.Set(0, 2, _cx);
+            _camMatrix.Set(1, 0, 0d);
+            _camMatrix.Set(1, 1, _fy);
+            _camMatrix.Set(1, 2, _cy);
+            _camMatrix.Set(2, 0, 0d);
+            _camMatrix.Set(2, 1, 0d);
+            _camMatrix.Set(2, 2, 1.0d);
 
-            _distCoeffs = new MatOfDouble(0, 0, 0, 0);
-            _objectPoints = new MatOfPoint3f();
-            _imagePoints = new MatOfPoint2f();
-            _rvec = new Mat(3, 1, CvType.CV_64FC1);
-            _tvec = new Mat(3, 1, CvType.CV_64FC1);
-            _rotationMatrix = new Mat(3, 3, CvType.CV_64FC1);
-            _pnpObjectPointMat = new Mat(3, 1, CvType.CV_64FC1);
-            _pnpCamSpacePointMat = new Mat(3, 1, CvType.CV_64FC1);
+            _distCoeffs = new Mat(4, 1, MatType.CV_64FC1);
+            _distCoeffs.SetTo(Scalar.All(0));
+
+            _rvec = new Mat(3, 1, MatType.CV_64FC1);
+            _tvec = new Mat(3, 1, MatType.CV_64FC1);
+            _rotationMatrix = new Mat(3, 3, MatType.CV_64FC1);
+            _pnpObjectPointMat = new Mat(3, 1, MatType.CV_64FC1);
+            _pnpCamSpacePointMat = new Mat(3, 1, MatType.CV_64FC1);
 
             _invertYM = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(1, -1, 1));
             _invertZM = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(1, 1, -1));
@@ -432,17 +429,21 @@ namespace PMC
                 var p3d = result.poseWorldLandmarks.landmarks[i];
                 var p2d = result.poseLandmarks.landmarks[i];
 
-                _objectPointsList.Add(new Point3(p3d.x, -p3d.y, p3d.z));
-                _imagePointsList.Add(new Point(p2d.x * ImageSource.Resolution.x, p2d.y * ImageSource.Resolution.y));
+                _objectPointsList.Add(new Point3f(p3d.x, -p3d.y, p3d.z));
+                _imagePointsList.Add(new Point2f(p2d.x * ImageSource.Resolution.x, p2d.y * ImageSource.Resolution.y));
             }
 
-            _objectPoints.fromList(_objectPointsList);
-            _imagePoints.fromList(_imagePointsList);
+            Cv2.SolvePnP(
+                InputArray.Create(_objectPointsList),
+                InputArray.Create(_imagePointsList),
+                _camMatrix,
+                _distCoeffs,
+                _rvec,
+                _tvec,
+                true,
+                SolvePnPFlags.EPNP);
 
-            Calib3d.solvePnP(_objectPoints, _imagePoints, _camMatrix, _distCoeffs, _rvec, _tvec, true, Calib3d.SOLVEPNP_SQPNP);
-            Calib3d.Rodrigues(_rvec, _rotationMatrix);
-
-            _tvec.get(0, 0, new double[3]);
+            Cv2.Rodrigues(_rvec, _rotationMatrix);
 
             var adjustedCameraSpacePoints = new Vector3[PoseLandmarkCount];
 
@@ -451,13 +452,13 @@ namespace PMC
                 var p3d = result.poseWorldLandmarks.landmarks[i];
                 var p2d = result.poseLandmarks.landmarks[i];
 
-                _pnpObjectPointMat.put(0, 0, p3d.x);
-                _pnpObjectPointMat.put(1, 0, -p3d.y);
-                _pnpObjectPointMat.put(2, 0, p3d.z);
+                _pnpObjectPointMat.Set(0, 0, (double)p3d.x);
+                _pnpObjectPointMat.Set(1, 0, (double)-p3d.y);
+                _pnpObjectPointMat.Set(2, 0, (double)p3d.z);
 
-                Core.gemm(_rotationMatrix, _pnpObjectPointMat, 1.0, _tvec, 1.0, _pnpCamSpacePointMat);
+                Cv2.Gemm(_rotationMatrix, _pnpObjectPointMat, 1.0, _tvec, 1.0, _pnpCamSpacePointMat, GemmFlags.None);
 
-                var z = _pnpCamSpacePointMat.get(2, 0)[0];
+                var z = _pnpCamSpacePointMat.At<double>(2, 0);
                 var x = (float)(((p2d.x * ImageSource.Resolution.x) - _cx) * z / _fx);
                 var y = (float)(((p2d.y * ImageSource.Resolution.y) - _cy) * z / _fy);
 
@@ -466,16 +467,19 @@ namespace PMC
 
             var hipCenterPos = (adjustedCameraSpacePoints[(int)PoseLandmark.LeftHip] + adjustedCameraSpacePoints[(int)PoseLandmark.RightHip]) / 2f;
 
-            Calib3d.Rodrigues(_rvec, _rotationMatrix);
+            var forward = new Vector3((float)_rotationMatrix.At<double>(0, 2), (float)_rotationMatrix.At<double>(1, 2), (float)_rotationMatrix.At<double>(2, 2));
+            var up = new Vector3((float)_rotationMatrix.At<double>(0, 1), (float)_rotationMatrix.At<double>(1, 1), (float)_rotationMatrix.At<double>(2, 1));
 
-            var rot = OpenCVARUtils.ConvertRvecToRot(_rvec);
+            var rotation = UnityUtils.LookRotation(forward, up);
 
-            _transformationM = Matrix4x4.TRS(hipCenterPos, rot, Vector3.one);
+            _transformationM = Matrix4x4.TRS(hipCenterPos, rotation, Vector3.one);
 
             var ARM = _invertYM * _transformationM * _invertYM * _invertYM * _invertZM;
 
             GlobalAvatarPosition = ARM.GetColumn(3);
             GlobalAvatarRotation = UnityUtils.LookRotation(ARM.GetColumn(2), ARM.GetColumn(1));
+
+            GlobalAvatarPosition = Vector3.Scale(GlobalAvatarPosition, MovementScale);
 
             if (_enableGlobalPoseFilter)
             {
@@ -487,8 +491,7 @@ namespace PMC
 
             for (int i = 0; i < PoseLandmarkCount; i++)
             {
-                LocalAvatarSpacePoints[i] = localRotInverse * (adjustedCameraSpacePoints[i] - hipCenterPos);
-                //LocalAvatarSpacePoints[i] = Vector3.Scale(localRotInverse * (adjustedCameraSpacePoints[i] - hipCenterPos), LandmarkScale);
+                LocalAvatarSpacePoints[i] = Vector3.Scale(localRotInverse * (adjustedCameraSpacePoints[i] - hipCenterPos), LandmarkScale);
 
                 if (_enableKalmanFilter)
                 {
@@ -510,7 +513,7 @@ namespace PMC
             {
                 landmarks[i].Set(normalizedLandmarks[i]);
 
-                //landmarks[i].Position = Vector3.Scale(landmarks[i].Position, LandmarkScale);
+                landmarks[i].Position = Vector3.Scale(landmarks[i].Position, LandmarkScale);
             }
 
             return true;
@@ -524,7 +527,7 @@ namespace PMC
             {
                 landmarks[i].Set(normalizedLandmarks[i]);
 
-                //landmarks[i].Position = Vector3.Scale(landmarks[i].Position, LandmarkScale);
+                landmarks[i].Position = Vector3.Scale(landmarks[i].Position, LandmarkScale);
             }
 
             return normalizedLandmarks != null;
