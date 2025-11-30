@@ -9,6 +9,7 @@ namespace PMC.Editor
     {
         private SerializedProperty ImageSource;
         private SerializedProperty ImageReadMode;
+        private SerializedProperty Framerate;
         private SerializedProperty MinFaceDetectionConfidence;
         private SerializedProperty MinFaceSuppressionThreshold;
         private SerializedProperty MinFaceLandmarksConfidence;
@@ -35,15 +36,18 @@ namespace PMC.Editor
         private SerializedProperty _globalPoseFilterMinCutoff;
         private SerializedProperty _globalPoseFilterBeta;
         private SerializedProperty _globalPoseFilterDcutoff;
+        private SerializedProperty ShowTrackingFPS;
 
         private static bool _mediapipeSettingsFoldout;
         private static bool _trackingSettingsFoldout;
         private static bool _filterSettingsFoldout;
+        private static bool _debugSettingsFoldout;
 
         private void OnEnable()
         {
             ImageSource = serializedObject.FindProperty(nameof(ImageSource));
             ImageReadMode = serializedObject.FindProperty(nameof(ImageReadMode));
+            Framerate = serializedObject.FindProperty(nameof(Framerate));
             MinFaceDetectionConfidence = serializedObject.FindProperty(nameof(MinFaceDetectionConfidence));
             MinFaceSuppressionThreshold = serializedObject.FindProperty(nameof(MinFaceSuppressionThreshold));
             MinFaceLandmarksConfidence = serializedObject.FindProperty(nameof(MinFaceLandmarksConfidence));
@@ -70,6 +74,7 @@ namespace PMC.Editor
             _globalPoseFilterMinCutoff = serializedObject.FindProperty(nameof(_globalPoseFilterMinCutoff));
             _globalPoseFilterBeta = serializedObject.FindProperty(nameof(_globalPoseFilterBeta));
             _globalPoseFilterDcutoff = serializedObject.FindProperty(nameof(_globalPoseFilterDcutoff));
+            ShowTrackingFPS = serializedObject.FindProperty(nameof(ShowTrackingFPS));
         }
 
         public override void OnInspectorGUI()
@@ -79,6 +84,7 @@ namespace PMC.Editor
             EditorGUILayout.BeginVertical("box");
             EditorGUILayout.PropertyField(ImageSource);
             EditorGUILayout.PropertyField(ImageReadMode);
+            EditorGUILayout.PropertyField(Framerate);
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space();
 
@@ -129,7 +135,6 @@ namespace PMC.Editor
                 using (new EditorGUI.IndentLevelScope())
                 {
                     EditorGUILayout.BeginVertical("box");
-                    EditorGUILayout.LabelField("Landmark Filter", EditorStyles.boldLabel);
                     EditorGUILayout.Space();
                     EditorGUILayout.PropertyField(_enableKalmanFilter);
 
@@ -169,6 +174,19 @@ namespace PMC.Editor
 
             EditorGUILayout.Space();
 
+            _debugSettingsFoldout = EditorGUILayout.Foldout(_debugSettingsFoldout, "Debug Settings", true);
+
+            if (_debugSettingsFoldout)
+            {
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    EditorGUILayout.BeginVertical("box");
+                    EditorGUILayout.PropertyField(ShowTrackingFPS);
+                    EditorGUILayout.EndVertical();
+                }
+            }
+
+            EditorGUILayout.Space();
             EditorGUILayout.LabelField($"{AssetInfo.AssetName} (v{AssetInfo.AssetVersion})", EditorStyles.centeredGreyMiniLabel);
 
             serializedObject.ApplyModifiedProperties();

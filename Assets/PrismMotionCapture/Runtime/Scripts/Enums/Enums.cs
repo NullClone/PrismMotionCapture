@@ -18,7 +18,6 @@ namespace PMC
     public enum ImageReadMode
     {
         CPU,
-        CPUAsync,
         GPU,
     }
 

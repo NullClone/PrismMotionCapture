@@ -9,9 +9,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Color = UnityEngine.Color;
+using Rect = UnityEngine.Rect;
 using RunningMode = Mediapipe.Tasks.Vision.Core.RunningMode;
 using Stopwatch = System.Diagnostics.Stopwatch;
 
@@ -25,7 +26,11 @@ namespace PMC
         public ImageSource ImageSource;
         private BaseOptions.Delegate _delegate;
         public TextAsset ModelAsset;
-        public ImageReadMode ImageReadMode = ImageReadMode.CPUAsync;
+        public ImageReadMode ImageReadMode = ImageReadMode.CPU;
+
+        [Range(1f, 60f)] public float Framerate = 30f;
+        private float _trackingFPS = 0f;
+        private long _lastFrameTick = 0;
 
         [Range(0f, 1f)] public float MinFaceDetectionConfidence = 0.5f;
         [Range(0f, 1f)] public float MinFaceSuppressionThreshold = 0.5f;
@@ -57,6 +62,8 @@ namespace PMC
         [SerializeField] private float _globalPoseFilterBeta = 0.1f;
         [SerializeField] private float _globalPoseFilterDcutoff = 1f;
 
+        public bool ShowTrackingFPS = true;
+
         private HolisticLandmarker _holisticLandmarker;
         private TextureFramePool _textureFramePool;
         private Stopwatch _stopwatch;
@@ -76,9 +83,6 @@ namespace PMC
         private Matrix4x4 _transformationM;
 
         private bool _initialized = false;
-
-        [HideInInspector] private int _resultCallbackCount = 0;
-        [HideInInspector] private float _fpsTimer = 0f;
 
         private OneEuroFilter<Vector3> _globalAvatarPositionOneEuroFilter;
         private OneEuroFilter<Quaternion> _globalAvatarRotationOneEuroFilter;
@@ -113,8 +117,6 @@ namespace PMC
         public Vector3 GlobalAvatarPosition { get; private set; } = Vector3.zero;
 
         public Quaternion GlobalAvatarRotation { get; private set; } = Quaternion.identity;
-
-        public int MediaPipeFPS { get; private set; }
 
         public bool ActiveFaceLandmark { get; private set; }
 
@@ -209,8 +211,20 @@ namespace PMC
 
             using var glContext = canUseGpuImage ? GpuManager.GetGlContext() : null;
 
+            var nextFrameTime = Time.time;
+
             while (true)
             {
+                var interval = 1f / Framerate;
+
+                if (Time.time < nextFrameTime)
+                {
+                    yield return null;
+                    continue;
+                }
+
+                nextFrameTime = Time.time + interval;
+
                 if (_textureFramePool.TryGetTextureFrame(out var textureFrame))
                 {
                     Image image = default;
@@ -218,16 +232,6 @@ namespace PMC
                     switch (ImageReadMode)
                     {
                         case ImageReadMode.CPU:
-                            {
-                                yield return waitForEndOfFrame;
-
-                                textureFrame.ReadTextureOnCPU(ImageSource.Texture, FlipHorizontally, FlipVertically);
-                                image = textureFrame.BuildCPUImage();
-                                textureFrame.Release();
-
-                                break;
-                            }
-                        case ImageReadMode.CPUAsync:
                             {
                                 req = textureFrame.ReadTextureAsync(ImageSource.Texture, FlipHorizontally, FlipVertically);
 
@@ -278,15 +282,24 @@ namespace PMC
             }
         }
 
-        private void Update()
+        private void OnGUI()
         {
-            _fpsTimer += Time.deltaTime;
-
-            if (_fpsTimer >= 1f)
+            if (ShowTrackingFPS)
             {
-                MediaPipeFPS = Interlocked.Exchange(ref _resultCallbackCount, 0);
+                const int Padding = 10;
 
-                _fpsTimer -= 1f;
+                var size = Mathf.RoundToInt(0.01f * Screen.width);
+                var style = new GUIStyle
+                {
+                    alignment = TextAnchor.MiddleRight,
+                    fontSize = size,
+                };
+
+                style.normal.textColor = Color.green;
+
+                var rect = new Rect(Padding, Screen.height - Padding - size, Screen.width - (2f * Padding), size);
+
+                GUI.Label(rect, $"{Mathf.RoundToInt(_trackingFPS)} FPS", style);
             }
         }
 
@@ -381,45 +394,6 @@ namespace PMC
             _transformationM = new Matrix4x4();
         }
 
-        private void ResultCallback(in HolisticLandmarkerResult holisticLandmarkerResult, Image image, long timestampMillisec)
-        {
-            ActiveFaceLandmark = Set(FaceLandmarks, holisticLandmarkerResult.faceLandmarks.landmarks);
-            ActivePoseLandmark = Set(PoseLandmarks, holisticLandmarkerResult.poseLandmarks.landmarks);
-            ActivePoseWorldLandmark = Set(PoseWorldLandmarks, holisticLandmarkerResult.poseWorldLandmarks.landmarks);
-            ActiveLeftHandLandmark = Set(LeftHandLandmarks, holisticLandmarkerResult.leftHandLandmarks.landmarks);
-            ActiveLeftHandWorldLandmark = Set(LeftHandWorldLandmarks, holisticLandmarkerResult.leftHandWorldLandmarks.landmarks);
-            ActiveRightHandLandmark = Set(RightHandLandmarks, holisticLandmarkerResult.rightHandLandmarks.landmarks);
-            ActiveRightHandWorldLandmark = Set(RightHandWorldLandmarks, holisticLandmarkerResult.rightHandWorldLandmarks.landmarks);
-            ActiveFaceBlendShapes = holisticLandmarkerResult.faceBlendshapes.categories != null && holisticLandmarkerResult.faceBlendshapes.categories.Count > 0;
-
-            if (ActiveFaceBlendShapes)
-            {
-                for (int i = 0; i < FaceBlendShapes.Length; i++)
-                {
-                    FaceBlendShapes[i] = holisticLandmarkerResult.faceBlendshapes.categories[i].score;
-                }
-            }
-
-            foreach (var landmark in PoseWorldLandmarks)
-            {
-                if (_enableKalmanFilter)
-                {
-                    landmark.Position = landmark.KalmanFilter.Update(landmark.Position);
-                }
-
-                if (_enableOneEuroFilter)
-                {
-                    landmark.Position = landmark.OneEuroFilter.Filter(landmark.Position, (float)_stopwatch.Elapsed.TotalSeconds);
-                }
-            }
-
-            UpdatePnP(holisticLandmarkerResult);
-
-            Interlocked.Increment(ref _resultCallbackCount);
-
-            OnCallback?.Invoke(holisticLandmarkerResult);
-        }
-
         private void UpdatePnP(HolisticLandmarkerResult result)
         {
             if (!ActivePoseLandmark || !ActivePoseWorldLandmark) return;
@@ -506,6 +480,58 @@ namespace PMC
                     LocalAvatarSpacePoints[i] = _oneEuroFilters[i].Filter(LocalAvatarSpacePoints[i], (float)_stopwatch.Elapsed.TotalSeconds);
                 }
             }
+        }
+
+        private void ResultCallback(in HolisticLandmarkerResult holisticLandmarkerResult, Image image, long timestampMillisec)
+        {
+            ActiveFaceLandmark = Set(FaceLandmarks, holisticLandmarkerResult.faceLandmarks.landmarks);
+            ActivePoseLandmark = Set(PoseLandmarks, holisticLandmarkerResult.poseLandmarks.landmarks);
+            ActivePoseWorldLandmark = Set(PoseWorldLandmarks, holisticLandmarkerResult.poseWorldLandmarks.landmarks);
+            ActiveLeftHandLandmark = Set(LeftHandLandmarks, holisticLandmarkerResult.leftHandLandmarks.landmarks);
+            ActiveLeftHandWorldLandmark = Set(LeftHandWorldLandmarks, holisticLandmarkerResult.leftHandWorldLandmarks.landmarks);
+            ActiveRightHandLandmark = Set(RightHandLandmarks, holisticLandmarkerResult.rightHandLandmarks.landmarks);
+            ActiveRightHandWorldLandmark = Set(RightHandWorldLandmarks, holisticLandmarkerResult.rightHandWorldLandmarks.landmarks);
+            ActiveFaceBlendShapes = holisticLandmarkerResult.faceBlendshapes.categories != null && holisticLandmarkerResult.faceBlendshapes.categories.Count > 0;
+
+            if (ActiveFaceBlendShapes)
+            {
+                for (int i = 0; i < FaceBlendShapes.Length; i++)
+                {
+                    FaceBlendShapes[i] = holisticLandmarkerResult.faceBlendshapes.categories[i].score;
+                }
+            }
+
+            foreach (var landmark in PoseWorldLandmarks)
+            {
+                if (_enableKalmanFilter)
+                {
+                    landmark.Position = landmark.KalmanFilter.Update(landmark.Position);
+                }
+
+                if (_enableOneEuroFilter)
+                {
+                    landmark.Position = landmark.OneEuroFilter.Filter(landmark.Position, (float)_stopwatch.Elapsed.TotalSeconds);
+                }
+            }
+
+            UpdatePnP(holisticLandmarkerResult);
+
+            OnCallback?.Invoke(holisticLandmarkerResult);
+
+
+            var currentTick = _stopwatch.ElapsedTicks;
+
+            if (_lastFrameTick != 0)
+            {
+                var elapsedSeconds = (float)(currentTick - _lastFrameTick) / Stopwatch.Frequency;
+
+                if (elapsedSeconds > 0)
+                {
+                    _trackingFPS = 1f / elapsedSeconds;
+                }
+            }
+
+            _lastFrameTick = currentTick;
         }
 
         private bool Set(Landmark[] landmarks, List<Mediapipe.Tasks.Components.Containers.NormalizedLandmark> normalizedLandmarks)
