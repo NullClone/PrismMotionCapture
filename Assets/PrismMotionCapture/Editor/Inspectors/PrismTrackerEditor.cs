@@ -27,16 +27,20 @@ namespace PMC.Editor
         private SerializedProperty _timeInterval;
         private SerializedProperty _noise;
         private SerializedProperty _enableOneEuroFilter;
-        private SerializedProperty _filterFrequency;
         private SerializedProperty _filterMinCutoff;
         private SerializedProperty _filterBeta;
         private SerializedProperty _filterDcutoff;
         private SerializedProperty _enableGlobalPoseFilter;
-        private SerializedProperty _globalPoseFilterFrequency;
         private SerializedProperty _globalPoseFilterMinCutoff;
         private SerializedProperty _globalPoseFilterBeta;
         private SerializedProperty _globalPoseFilterDcutoff;
         private SerializedProperty ShowTrackingFPS;
+        private SerializedProperty ShowLandmark;
+        private SerializedProperty LandmarkRadius;
+        private SerializedProperty LandmarkPosition;
+        private SerializedProperty LeftLandmarkColor;
+        private SerializedProperty RightLandmarkColor;
+        private SerializedProperty ConnectionColor;
 
         private static bool _mediapipeSettingsFoldout;
         private static bool _trackingSettingsFoldout;
@@ -65,16 +69,20 @@ namespace PMC.Editor
             _timeInterval = serializedObject.FindProperty(nameof(_timeInterval));
             _noise = serializedObject.FindProperty(nameof(_noise));
             _enableOneEuroFilter = serializedObject.FindProperty(nameof(_enableOneEuroFilter));
-            _filterFrequency = serializedObject.FindProperty(nameof(_filterFrequency));
             _filterMinCutoff = serializedObject.FindProperty(nameof(_filterMinCutoff));
             _filterBeta = serializedObject.FindProperty(nameof(_filterBeta));
             _filterDcutoff = serializedObject.FindProperty(nameof(_filterDcutoff));
             _enableGlobalPoseFilter = serializedObject.FindProperty(nameof(_enableGlobalPoseFilter));
-            _globalPoseFilterFrequency = serializedObject.FindProperty(nameof(_globalPoseFilterFrequency));
             _globalPoseFilterMinCutoff = serializedObject.FindProperty(nameof(_globalPoseFilterMinCutoff));
             _globalPoseFilterBeta = serializedObject.FindProperty(nameof(_globalPoseFilterBeta));
             _globalPoseFilterDcutoff = serializedObject.FindProperty(nameof(_globalPoseFilterDcutoff));
             ShowTrackingFPS = serializedObject.FindProperty(nameof(ShowTrackingFPS));
+            ShowLandmark = serializedObject.FindProperty(nameof(ShowLandmark));
+            LandmarkRadius = serializedObject.FindProperty(nameof(LandmarkRadius));
+            LandmarkPosition = serializedObject.FindProperty(nameof(LandmarkPosition));
+            LeftLandmarkColor = serializedObject.FindProperty(nameof(LeftLandmarkColor));
+            RightLandmarkColor = serializedObject.FindProperty(nameof(RightLandmarkColor));
+            ConnectionColor = serializedObject.FindProperty(nameof(ConnectionColor));
         }
 
         public override void OnInspectorGUI()
@@ -149,7 +157,6 @@ namespace PMC.Editor
 
                     using (new EditorGUI.DisabledGroupScope(!_enableOneEuroFilter.boolValue))
                     {
-                        EditorGUILayout.PropertyField(_filterFrequency);
                         EditorGUILayout.PropertyField(_filterMinCutoff);
                         EditorGUILayout.PropertyField(_filterBeta);
                         EditorGUILayout.PropertyField(_filterDcutoff);
@@ -162,7 +169,6 @@ namespace PMC.Editor
 
                     using (new EditorGUI.DisabledGroupScope(!_enableGlobalPoseFilter.boolValue))
                     {
-                        EditorGUILayout.PropertyField(_globalPoseFilterFrequency);
                         EditorGUILayout.PropertyField(_globalPoseFilterMinCutoff);
                         EditorGUILayout.PropertyField(_globalPoseFilterBeta);
                         EditorGUILayout.PropertyField(_globalPoseFilterDcutoff);
@@ -182,6 +188,14 @@ namespace PMC.Editor
                 {
                     EditorGUILayout.BeginVertical("box");
                     EditorGUILayout.PropertyField(ShowTrackingFPS);
+                    EditorGUILayout.PropertyField(ShowLandmark);
+                    EditorGUILayout.Space();
+                    EditorGUILayout.PropertyField(LandmarkRadius);
+                    EditorGUILayout.PropertyField(LandmarkPosition);
+                    EditorGUILayout.Space();
+                    EditorGUILayout.PropertyField(LeftLandmarkColor);
+                    EditorGUILayout.PropertyField(RightLandmarkColor);
+                    EditorGUILayout.PropertyField(ConnectionColor);
                     EditorGUILayout.EndVertical();
                 }
             }

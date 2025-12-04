@@ -1,10 +1,9 @@
-using Mediapipe;
+﻿using Mediapipe;
 using Mediapipe.Tasks.Core;
 using Mediapipe.Tasks.Vision.HolisticLandmarker;
 using Mediapipe.Unity;
 using Mediapipe.Unity.Experimental;
 using OpenCvSharp;
-using PMC.Utilities;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -52,17 +51,21 @@ namespace PMC
         [SerializeField] private float _timeInterval = 0.45f;
         [SerializeField] private float _noise = 0.4f;
         [SerializeField] private bool _enableOneEuroFilter = true;
-        [SerializeField] private float _filterFrequency = 120f;
         [SerializeField] private float _filterMinCutoff = 1f;
         [SerializeField] private float _filterBeta = 0.1f;
         [SerializeField] private float _filterDcutoff = 1f;
         [SerializeField] private bool _enableGlobalPoseFilter = true;
-        [SerializeField] private float _globalPoseFilterFrequency = 120f;
         [SerializeField] private float _globalPoseFilterMinCutoff = 1f;
         [SerializeField] private float _globalPoseFilterBeta = 0.1f;
         [SerializeField] private float _globalPoseFilterDcutoff = 1f;
 
         public bool ShowTrackingFPS = true;
+        public bool ShowLandmark = true;
+        public float LandmarkRadius = 0.01f;
+        public Vector3 LandmarkPosition = Vector3.zero;
+        public Color LeftLandmarkColor = new(1f, 0.5f, 0f, 1f);
+        public Color RightLandmarkColor = new(0f, 1f, 1f, 1f);
+        public Color ConnectionColor = new(1f, 1f, 1f, 1f);
 
         private HolisticLandmarker _holisticLandmarker;
         private TextureFramePool _textureFramePool;
@@ -80,28 +83,33 @@ namespace PMC
 
         private Matrix4x4 _invertYM;
         private Matrix4x4 _invertZM;
-        private Matrix4x4 _transformationM;
 
         private bool _initialized = false;
 
         private OneEuroFilter<Vector3> _globalAvatarPositionOneEuroFilter;
-        private OneEuroFilter<Quaternion> _globalAvatarRotationOneEuroFilter;
 
-
-        private readonly KalmanFilter[] _kalmanFilters = new KalmanFilter[PoseLandmarkCount];
-        private readonly OneEuroFilter<Vector3>[] _oneEuroFilters = new OneEuroFilter<Vector3>[PoseLandmarkCount];
 
         private readonly List<Point3f> _objectPointsList = new();
         private readonly List<Point2f> _imagePointsList = new();
 
         private readonly int[] _pnpLandmarkIndices = new int[]
         {
-            (int)PoseLandmark.Nose,
-            (int)PoseLandmark.LeftEye, (int)PoseLandmark.RightEye,
-            (int)PoseLandmark.LeftEar, (int)PoseLandmark.RightEar,
-            (int)PoseLandmark.LeftShoulder, (int)PoseLandmark.RightShoulder,
-            (int)PoseLandmark.LeftHip, (int)PoseLandmark.RightHip,
+            (int)PoseLandmark.LeftShoulder,
+            (int)PoseLandmark.RightShoulder,
+            (int)PoseLandmark.LeftHip,
+            (int)PoseLandmark.RightHip,
         };
+
+        private readonly Vector3[] _positions = new Vector3[PoseLandmarkCount];
+
+        private static readonly HashSet<int> _LeftLandmarks = new() { 1, 2, 3, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31 };
+        private static readonly HashSet<int> _RightLandmarks = new() { 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32 };
+        private static readonly List<(int, int)> _Connections = new() {
+            (0, 1), (1, 2), (2, 3), (3, 7),(0, 4), (4, 5), (5, 6),
+            (6, 8),(9, 10),(11, 13), (13, 15),(15, 17), (15, 19), (15, 21),
+            (17, 19),(12, 14), (14, 16),(16, 18), (16, 20), (16, 22),(18, 20),
+            (11, 12), (12, 24), (24, 23), (23, 11),(23, 25), (25, 27), (27, 29),
+            (27, 31), (29, 31),(24, 26), (26, 28), (28, 30), (28, 32), (30, 32),};
 
 
         public const string ModelAssetPath = "holistic_landmarker.bytes";
@@ -112,11 +120,7 @@ namespace PMC
         public const int FaceBlendShapeCount = 52;
 
 
-        // Properties
-
-        public Vector3 GlobalAvatarPosition { get; private set; } = Vector3.zero;
-
-        public Quaternion GlobalAvatarRotation { get; private set; } = Quaternion.identity;
+        // Properties        
 
         public bool ActiveFaceLandmark { get; private set; }
 
@@ -150,12 +154,7 @@ namespace PMC
 
         public float[] FaceBlendShapes { get; private set; } = new float[FaceBlendShapeCount];
 
-        public Vector3[] LocalAvatarSpacePoints { get; private set; } = new Vector3[PoseLandmarkCount];
-
-
-        // Events
-
-        public event Action<HolisticLandmarkerResult> OnCallback;
+        public Vector3 GlobalAvatarPosition { get; private set; }
 
 
         // Methods
@@ -284,7 +283,7 @@ namespace PMC
 
         private void OnGUI()
         {
-            if (ShowTrackingFPS)
+            if (ShowTrackingFPS || !enabled)
             {
                 const int Padding = 10;
 
@@ -300,6 +299,41 @@ namespace PMC
                 var rect = new Rect(Padding, Screen.height - Padding - size, Screen.width - (2f * Padding), size);
 
                 GUI.Label(rect, $"{Mathf.RoundToInt(_trackingFPS)} FPS", style);
+            }
+        }
+
+        private void OnDrawGizmos()
+        {
+            if (!Application.isPlaying || !enabled) return;
+
+            if (ShowLandmark)
+            {
+                //var positions = PoseWorldLandmarks.Select(t => t.Position).ToArray();
+                var positions = _positions;
+
+                if (positions == null) return;
+
+                Gizmos.color = ConnectionColor;
+
+                foreach (var conn in _Connections)
+                {
+                    Gizmos.DrawLine(positions[conn.Item1] + LandmarkPosition, positions[conn.Item2] + LandmarkPosition);
+                }
+
+                for (int i = 0; i < positions.Length; i++)
+                {
+                    if (_LeftLandmarks.Contains(i))
+                    {
+                        Gizmos.color = LeftLandmarkColor;
+                    }
+
+                    if (_RightLandmarks.Contains(i))
+                    {
+                        Gizmos.color = RightLandmarkColor;
+                    }
+
+                    Gizmos.DrawSphere(positions[i] + LandmarkPosition, LandmarkRadius);
+                }
             }
         }
 
@@ -335,30 +369,11 @@ namespace PMC
 
                 if (_enableOneEuroFilter)
                 {
-                    landmark.OneEuroFilter = new OneEuroFilter<Vector3>(_filterFrequency, _filterMinCutoff, _filterBeta, _filterDcutoff);
+                    landmark.OneEuroFilter = new OneEuroFilter<Vector3>(Framerate, _filterMinCutoff, _filterBeta, _filterDcutoff);
                 }
             }
 
-            if (_enableKalmanFilter)
-            {
-                for (int i = 0; i < _kalmanFilters.Length; i++)
-                {
-                    _kalmanFilters[i] = new KalmanFilter();
-                    _kalmanFilters[i].SetParameter(_timeInterval, _noise);
-                    _kalmanFilters[i].Predict();
-                }
-            }
-
-            if (_enableOneEuroFilter)
-            {
-                for (int i = 0; i < _kalmanFilters.Length; i++)
-                {
-                    _oneEuroFilters[i] = new OneEuroFilter<Vector3>(_filterFrequency, _filterMinCutoff, _filterBeta, _filterDcutoff);
-                }
-            }
-
-            _globalAvatarPositionOneEuroFilter = new OneEuroFilter<Vector3>(_globalPoseFilterFrequency, _globalPoseFilterMinCutoff, _globalPoseFilterBeta, _globalPoseFilterDcutoff);
-            _globalAvatarRotationOneEuroFilter = new OneEuroFilter<Quaternion>(_globalPoseFilterFrequency, _globalPoseFilterMinCutoff, _globalPoseFilterBeta, _globalPoseFilterDcutoff);
+            _globalAvatarPositionOneEuroFilter = new OneEuroFilter<Vector3>(Framerate, _globalPoseFilterMinCutoff, _globalPoseFilterBeta, _globalPoseFilterDcutoff);
         }
 
         private void InitializePnP()
@@ -391,7 +406,6 @@ namespace PMC
 
             _invertYM = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(1, -1, 1));
             _invertZM = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(1, 1, -1));
-            _transformationM = new Matrix4x4();
         }
 
         private void UpdatePnP(HolisticLandmarkerResult result)
@@ -410,7 +424,7 @@ namespace PMC
                 _imagePointsList.Add(new Point2f(p2d.x * ImageSource.Resolution.x, p2d.y * ImageSource.Resolution.y));
             }
 
-            Cv2.SolvePnP(
+            Cv2.SolvePnPRansac(
                 InputArray.Create(_objectPointsList),
                 InputArray.Create(_imagePointsList),
                 _camMatrix,
@@ -418,11 +432,13 @@ namespace PMC
                 _rvec,
                 _tvec,
                 true,
-                SolvePnPFlags.EPNP);
+                100,
+                8f,
+                0.99,
+                null,
+                SolvePnPFlags.Iterative);
 
             Cv2.Rodrigues(_rvec, _rotationMatrix);
-
-            var adjustedCameraSpacePoints = new Vector3[PoseLandmarkCount];
 
             for (int i = 0; i < PoseLandmarkCount; i++)
             {
@@ -435,50 +451,20 @@ namespace PMC
 
                 Cv2.Gemm(_rotationMatrix, _pnpObjectPointMat, 1.0, _tvec, 1.0, _pnpCamSpacePointMat, GemmFlags.None);
 
-                var z = _pnpCamSpacePointMat.At<double>(2, 0);
+                var z = (float)_pnpCamSpacePointMat.At<double>(2, 0);
                 var x = (float)(((p2d.x * ImageSource.Resolution.x) - _cx) * z / _fx);
                 var y = (float)(((p2d.y * ImageSource.Resolution.y) - _cy) * z / _fy);
 
-                adjustedCameraSpacePoints[i] = new Vector3(x, y, (float)z);
+                _positions[i] = new Vector3(x, y, 0);
             }
 
-            var hipCenterPos = (adjustedCameraSpacePoints[(int)PoseLandmark.LeftHip] + adjustedCameraSpacePoints[(int)PoseLandmark.RightHip]) / 2f;
+            var hipCenterPos = (_positions[(int)PoseLandmark.LeftHip] + _positions[(int)PoseLandmark.RightHip]) / 2f;
 
-            var forward = new Vector3((float)_rotationMatrix.At<double>(0, 2), (float)_rotationMatrix.At<double>(1, 2), (float)_rotationMatrix.At<double>(2, 2));
-            var up = new Vector3((float)_rotationMatrix.At<double>(0, 1), (float)_rotationMatrix.At<double>(1, 1), (float)_rotationMatrix.At<double>(2, 1));
-
-            var rotation = UnityUtils.LookRotation(forward, up);
-
-            _transformationM = Matrix4x4.TRS(hipCenterPos, rotation, Vector3.one);
-
-            var ARM = _invertYM * _transformationM * _invertYM * _invertYM * _invertZM;
-
-            GlobalAvatarPosition = ARM.GetColumn(3);
-            GlobalAvatarRotation = UnityUtils.LookRotation(ARM.GetColumn(2), ARM.GetColumn(1));
-
-            GlobalAvatarPosition = Vector3.Scale(GlobalAvatarPosition, MovementScale);
+            GlobalAvatarPosition = Vector3.Scale(hipCenterPos, MovementScale);
 
             if (_enableGlobalPoseFilter)
             {
                 GlobalAvatarPosition = _globalAvatarPositionOneEuroFilter.Filter(GlobalAvatarPosition, (float)_stopwatch.Elapsed.TotalSeconds);
-                GlobalAvatarRotation = _globalAvatarRotationOneEuroFilter.Filter(GlobalAvatarRotation, (float)_stopwatch.Elapsed.TotalSeconds);
-            }
-
-            var localRotInverse = Quaternion.Inverse(GlobalAvatarRotation);
-
-            for (int i = 0; i < PoseLandmarkCount; i++)
-            {
-                LocalAvatarSpacePoints[i] = Vector3.Scale(localRotInverse * (adjustedCameraSpacePoints[i] - hipCenterPos), LandmarkScale);
-
-                if (_enableKalmanFilter)
-                {
-                    LocalAvatarSpacePoints[i] = _kalmanFilters[i].Update(LocalAvatarSpacePoints[i]);
-                }
-
-                if (_enableOneEuroFilter)
-                {
-                    LocalAvatarSpacePoints[i] = _oneEuroFilters[i].Filter(LocalAvatarSpacePoints[i], (float)_stopwatch.Elapsed.TotalSeconds);
-                }
             }
         }
 
@@ -492,6 +478,8 @@ namespace PMC
             ActiveRightHandLandmark = Set(RightHandLandmarks, holisticLandmarkerResult.rightHandLandmarks.landmarks);
             ActiveRightHandWorldLandmark = Set(RightHandWorldLandmarks, holisticLandmarkerResult.rightHandWorldLandmarks.landmarks);
             ActiveFaceBlendShapes = holisticLandmarkerResult.faceBlendshapes.categories != null && holisticLandmarkerResult.faceBlendshapes.categories.Count > 0;
+
+            UpdatePnP(holisticLandmarkerResult);
 
             if (ActiveFaceBlendShapes)
             {
@@ -513,10 +501,6 @@ namespace PMC
                     landmark.Position = landmark.OneEuroFilter.Filter(landmark.Position, (float)_stopwatch.Elapsed.TotalSeconds);
                 }
             }
-
-            UpdatePnP(holisticLandmarkerResult);
-
-            OnCallback?.Invoke(holisticLandmarkerResult);
 
 
             var currentTick = _stopwatch.ElapsedTicks;
