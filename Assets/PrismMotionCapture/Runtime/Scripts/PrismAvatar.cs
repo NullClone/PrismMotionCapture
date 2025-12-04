@@ -26,8 +26,9 @@ namespace PMC
         public bool EnableTwistRelaxer = true;
         public bool EnableMovement = true;
         public bool AutoWeight = true;
+        public float RotationSmoothSpeed = 20f;
+        public float PositionSmoothSpeed = 20f;
         public float WeightSmoothingSpeed = 10f;
-        public float TargetRotationSmoothSpeed = 20f;
 
         public bool EnableHandTracking = true;
         public float FingerResetSpeed = 5f;
@@ -71,7 +72,6 @@ namespace PMC
         private Transform _rightThighTarget;
 
         private Vector3 _basePosition;
-        private Vector3 _baseTrackingPosition;
         private Vector3 _pelvisBasePosition;
         private Quaternion _inverseLeftHandRotation;
         private Quaternion _inverseRightHandRotation;
@@ -379,7 +379,7 @@ namespace PMC
             _VRIK.solver.spine.headClampWeight = 0f;
             _VRIK.solver.spine.maxRootAngle = 20f;
             _VRIK.solver.spine.maintainPelvisPosition = 0.2f;
-            _VRIK.solver.plantFeet = false;
+            _VRIK.solver.plantFeet = true;
 
             _VRIK.solver.spine.headTarget = _headTarget;
             _VRIK.solver.spine.pelvisTarget = _pelvisTarget;
@@ -395,9 +395,9 @@ namespace PMC
 
             _VRIK.solver.spine.positionWeight = 0.5f;
             _VRIK.solver.spine.rotationWeight = 1f;
-            _VRIK.solver.spine.pelvisPositionWeight = 1f;
+            _VRIK.solver.spine.pelvisPositionWeight = 0f;
             _VRIK.solver.spine.pelvisRotationWeight = 1f;
-            _VRIK.solver.spine.chestGoalWeight = 1f;
+            _VRIK.solver.spine.chestGoalWeight = 0f;
             _VRIK.solver.leftArm.positionWeight = 1f;
             _VRIK.solver.leftArm.rotationWeight = 1f;
             _VRIK.solver.leftArm.bendGoalWeight = 1f;
@@ -411,6 +411,9 @@ namespace PMC
             _VRIK.solver.rightLeg.rotationWeight = 1f;
             _VRIK.solver.rightLeg.bendGoalWeight = 1f;
 
+            _VRIK.solver.leftLeg.swivelOffset = -20f;
+            _VRIK.solver.rightLeg.swivelOffset = 20f;
+
             _VRIK.solver.leftArm.shoulderRotationMode = IKSolverVR.Arm.ShoulderRotationMode.FromTo;
             _VRIK.solver.leftArm.shoulderRotationWeight = 0.3f;
             _VRIK.solver.leftArm.shoulderTwistWeight = 0.7f;
@@ -419,14 +422,15 @@ namespace PMC
             _VRIK.solver.rightArm.shoulderRotationWeight = 0.3f;
             _VRIK.solver.rightArm.shoulderTwistWeight = 0.7f;
 
-            _VRIK.solver.locomotion.footDistance = 0.1f;
-            _VRIK.solver.locomotion.stepThreshold = 0.2f;
+            _VRIK.solver.locomotion.weight = 1.0f;
+            _VRIK.solver.locomotion.footDistance = 0.15f;
+            _VRIK.solver.locomotion.stepThreshold = 0.3f;
             _VRIK.solver.locomotion.angleThreshold = 60f;
             _VRIK.solver.locomotion.maxVelocity = 0.4f;
             _VRIK.solver.locomotion.velocityFactor = 0.4f;
             _VRIK.solver.locomotion.rootSpeed = 20f;
             _VRIK.solver.locomotion.stepSpeed = 3f;
-            _VRIK.solver.locomotion.weight = 1.0f;
+
 
             if (EnableTwistRelaxer)
             {
@@ -558,30 +562,13 @@ namespace PMC
 
         private void UpdateMovement()
         {
-            if (Tracker.ActivePoseWorldLandmark)
-            {
-                for (int i = 0; i < PrismTracker.PoseLandmarkCount; i++)
-                {
-                    Tracker.PoseWorldLandmarks[i].Position = Tracker.LocalAvatarSpacePoints[i];
-                }
-            }
-
             if (EnableMovement)
             {
                 var pos = Tracker.GlobalAvatarPosition;
 
-                pos.y *= -1f;
                 pos.z *= -1f;
 
-                if (Tracker.GlobalAvatarPosition != Vector3.zero && _baseTrackingPosition == Vector3.zero)
-                {
-                    _baseTrackingPosition = pos;
-
-                    _basePosition.y += _pelvisBasePosition.y;
-                }
-
-                _root.position = pos - _baseTrackingPosition + _basePosition;
-                _root.rotation = Tracker.GlobalAvatarRotation;
+                _root.localPosition = pos + _pelvisBasePosition;
 
                 if (IKType == IKType.VRIK)
                 {
@@ -598,10 +585,11 @@ namespace PMC
         {
             if (!Tracker.ActivePoseWorldLandmark) return;
 
-            var rotDelta = Time.deltaTime * TargetRotationSmoothSpeed;
+            var rotDelta = Time.deltaTime * RotationSmoothSpeed;
+
 
             // --------------------------------------------------
-            // Body Rotation (Stabilized version)
+            // Body Rotation
             // --------------------------------------------------
 
             var centerHipPosition = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftHip].Position + Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHip].Position) / 2f;
@@ -612,6 +600,7 @@ namespace PMC
             var bodyForwardVector = Vector3.Cross(bodyRightVector, bodyUpVector).normalized;
 
             var targetPelvisRotation = UnityUtils.LookRotation(bodyForwardVector, bodyUpVector);
+
             _pelvisTarget.localRotation = Quaternion.Slerp(_pelvisTarget.localRotation, targetPelvisRotation, rotDelta);
 
 
@@ -627,18 +616,8 @@ namespace PMC
             var headUpVector = Vector3.Cross(headForwardVector, headRightVector).normalized;
 
             var targetHeadRotation = UnityUtils.LookRotation(headForwardVector, headUpVector);
+
             _headTarget.localRotation = Quaternion.Slerp(_headTarget.localRotation, targetHeadRotation, rotDelta);
-
-
-            // --------------------------------------------------
-            // Chest
-            // --------------------------------------------------
-
-            var leftShoulderPos = Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftShoulder].Position;
-            var rightShoulderPos = Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightShoulder].Position;
-            var chestPos = (leftShoulderPos + rightShoulderPos) * 0.5f;
-
-            _chestGoal.localPosition = chestPos;
 
 
             // --------------------------------------------------
@@ -715,25 +694,34 @@ namespace PMC
             // Position
             // --------------------------------------------------
 
-            _headTarget.localPosition = Tracker.PoseWorldLandmarks[(int)PoseLandmark.Nose].Position;
+            var posDelta = Time.deltaTime * PositionSmoothSpeed;
 
-            _leftHandTarget.localPosition = Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftWrist].Position;
-            _rightHandTarget.localPosition = Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightWrist].Position;
 
-            _leftArmBendGoal.localPosition = Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftElbow].Position;
-            _rightArmBendGoal.localPosition = Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightElbow].Position;
+            _headTarget.localPosition = Vector3.Lerp(_headTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.Nose].Position, posDelta);
 
-            _leftShoulderTarget.localPosition = Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftShoulder].Position;
-            _rightShoulderTarget.localPosition = Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightShoulder].Position;
+            _leftHandTarget.localPosition = Vector3.Lerp(_leftHandTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftWrist].Position, posDelta);
+            _rightHandTarget.localPosition = Vector3.Lerp(_rightHandTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightWrist].Position, posDelta);
 
-            _leftFootTarget.localPosition = Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftHeel].Position;
-            _rightFootTarget.localPosition = Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHeel].Position;
+            _leftArmBendGoal.localPosition = Vector3.Lerp(_leftArmBendGoal.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftElbow].Position, posDelta);
+            _rightArmBendGoal.localPosition = Vector3.Lerp(_rightArmBendGoal.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightElbow].Position, posDelta);
 
-            _leftLegBendGoal.localPosition = Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftKnee].Position;
-            _rightLegBendGoal.localPosition = Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightKnee].Position;
+            _leftShoulderTarget.localPosition = Vector3.Lerp(_leftShoulderTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftShoulder].Position, posDelta);
+            _rightShoulderTarget.localPosition = Vector3.Lerp(_rightShoulderTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightShoulder].Position, posDelta);
 
-            _leftThighTarget.localPosition = Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftHip].Position;
-            _rightThighTarget.localPosition = Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHip].Position;
+            _leftFootTarget.localPosition = Vector3.Lerp(_leftFootTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftHeel].Position, posDelta);
+            _rightFootTarget.localPosition = Vector3.Lerp(_rightFootTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHeel].Position, posDelta);
+
+            _leftLegBendGoal.localPosition = Vector3.Lerp(_leftLegBendGoal.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftKnee].Position, posDelta);
+            _rightLegBendGoal.localPosition = Vector3.Lerp(_rightLegBendGoal.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightKnee].Position, posDelta);
+
+            _leftThighTarget.localPosition = Vector3.Lerp(_leftThighTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftHip].Position, posDelta);
+            _rightThighTarget.localPosition = Vector3.Lerp(_rightThighTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHip].Position, posDelta);
+
+            var chestPosition = (
+                Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftShoulder].Position +
+                Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightShoulder].Position) * 0.5f;
+
+            _chestGoal.localPosition = Vector3.Lerp(_chestGoal.localPosition, chestPosition, posDelta);
         }
 
         private void UpdateVRIK()

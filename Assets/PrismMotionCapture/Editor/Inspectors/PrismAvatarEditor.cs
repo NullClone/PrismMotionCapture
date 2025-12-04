@@ -11,8 +11,9 @@ namespace PMC.Editor
         private SerializedProperty EnableTwistRelaxer;
         private SerializedProperty EnableMovement;
         private SerializedProperty AutoWeight;
+        private SerializedProperty RotationSmoothSpeed;
+        private SerializedProperty PositionSmoothSpeed;
         private SerializedProperty WeightSmoothingSpeed;
-        private SerializedProperty TargetRotationSmoothSpeed;
         private SerializedProperty EnableHandTracking;
         private SerializedProperty FingerResetSpeed;
         private SerializedProperty HandRotationOffset;
@@ -46,7 +47,9 @@ namespace PMC.Editor
             EnableMovement = serializedObject.FindProperty(nameof(EnableMovement));
             AutoWeight = serializedObject.FindProperty(nameof(AutoWeight));
             WeightSmoothingSpeed = serializedObject.FindProperty(nameof(WeightSmoothingSpeed));
-            TargetRotationSmoothSpeed = serializedObject.FindProperty(nameof(TargetRotationSmoothSpeed));
+            RotationSmoothSpeed = serializedObject.FindProperty(nameof(RotationSmoothSpeed));
+            PositionSmoothSpeed = serializedObject.FindProperty(nameof(PositionSmoothSpeed));
+            WeightSmoothingSpeed = serializedObject.FindProperty(nameof(WeightSmoothingSpeed));
             EnableHandTracking = serializedObject.FindProperty(nameof(EnableHandTracking));
             FingerResetSpeed = serializedObject.FindProperty(nameof(FingerResetSpeed));
             HandRotationOffset = serializedObject.FindProperty(nameof(HandRotationOffset));
@@ -77,8 +80,9 @@ namespace PMC.Editor
             EditorGUILayout.PropertyField(EnableTwistRelaxer);
             EditorGUILayout.PropertyField(EnableMovement);
             EditorGUILayout.PropertyField(AutoWeight);
+            EditorGUILayout.PropertyField(RotationSmoothSpeed);
+            EditorGUILayout.PropertyField(PositionSmoothSpeed);
             EditorGUILayout.PropertyField(WeightSmoothingSpeed);
-            EditorGUILayout.PropertyField(TargetRotationSmoothSpeed);
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space();
 
