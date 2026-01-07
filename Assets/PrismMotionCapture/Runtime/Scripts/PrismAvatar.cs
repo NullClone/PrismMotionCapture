@@ -7,9 +7,8 @@ using UniVRM10;
 
 namespace PMC
 {
-    [AddComponentMenu("Prism Motion Capture/Prism Avatar")]
-    [DisallowMultipleComponent]
     [RequireComponent(typeof(Animator))]
+    [AddComponentMenu("Prism Motion Capture/Prism Avatar")]
     public sealed class PrismAvatar : MonoBehaviour
     {
         // Fields
@@ -71,10 +70,14 @@ namespace PMC
         private Transform _leftThighTarget;
         private Transform _rightThighTarget;
 
+        private Vector3[] _positions;
         private Vector3 _basePosition;
         private Vector3 _pelvisBasePosition;
         private Quaternion _inverseLeftHandRotation;
         private Quaternion _inverseRightHandRotation;
+
+        private float _upperArmLeft, _lowerArmLeft, _upperArmRight, _lowerArmRight;
+        private float _upperLegLeft, _lowerLegLeft, _upperLegRight, _lowerLegRight;
 
         private float _currentLeftLegWeight = 0f;
         private float _currentRightLegWeight = 0f;
@@ -99,7 +102,6 @@ namespace PMC
         private float _blinkTimer;
         private float _nextBlink = 4f;
         private float _blinkState;
-
 
         private readonly TimeInterpolate _blinkInterpolate = new();
         private readonly TimeInterpolate _gazeInterpolate = new();
@@ -163,7 +165,7 @@ namespace PMC
             if (!_initialized) return;
 
             CreateTarget();
-
+            Calibrate();
             InitializeFinger();
 
             if (IKType == IKType.VRIK)
@@ -192,22 +194,17 @@ namespace PMC
 
         private void OnPreVRIK()
         {
-            UpdateMovement();
-
             //var pelvisTargetRight = Quaternion.Inverse(_pelvisTarget.rotation) * _VRIK.references.root.right;
             //_VRIK.references.pelvis.position = Vector3.Lerp(_VRIK.references.pelvis.position, _pelvisTarget.position, _VRIK.solver.spine.pelvisPositionWeight);
             //_VRIK.references.pelvis.rotation = Quaternion.Slerp(_VRIK.references.pelvis.rotation, _pelvisTarget.rotation, _VRIK.solver.spine.pelvisRotationWeight);
 
+            UpdateMovement();
             UpdateTarget();
             UpdateVRIK();
             UpdateFinger();
-
-            if (_vrm)
-            {
-                UpdateBlink();
-                UpdateGaze();
-                UpdateMouth();
-            }
+            UpdateBlink();
+            UpdateGaze();
+            UpdateMouth();
         }
 
         private void OnPreFBBIK()
@@ -216,13 +213,9 @@ namespace PMC
             UpdateTarget();
             UpdateFBBIK();
             UpdateFinger();
-
-            if (_vrm)
-            {
-                UpdateBlink();
-                UpdateGaze();
-                UpdateMouth();
-            }
+            UpdateBlink();
+            UpdateGaze();
+            UpdateMouth();
         }
 
         private void CreateTarget()
@@ -259,6 +252,19 @@ namespace PMC
             _rightLegBendGoal.parent = _root;
             _leftThighTarget.parent = _root;
             _rightThighTarget.parent = _root;
+        }
+
+        private void Calibrate()
+        {
+            _upperArmLeft = GetBoneLength(HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm);
+            _lowerArmLeft = GetBoneLength(HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand);
+            _upperArmRight = GetBoneLength(HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm);
+            _lowerArmRight = GetBoneLength(HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand);
+
+            _upperLegLeft = GetBoneLength(HumanBodyBones.LeftUpperLeg, HumanBodyBones.LeftLowerLeg);
+            _lowerLegLeft = GetBoneLength(HumanBodyBones.LeftLowerLeg, HumanBodyBones.LeftFoot);
+            _upperLegRight = GetBoneLength(HumanBodyBones.RightUpperLeg, HumanBodyBones.RightLowerLeg);
+            _lowerLegRight = GetBoneLength(HumanBodyBones.RightLowerLeg, HumanBodyBones.RightFoot);
         }
 
         private void InitializeFinger()
@@ -411,8 +417,8 @@ namespace PMC
             _VRIK.solver.rightLeg.rotationWeight = 1f;
             _VRIK.solver.rightLeg.bendGoalWeight = 1f;
 
-            _VRIK.solver.leftLeg.swivelOffset = -20f;
-            _VRIK.solver.rightLeg.swivelOffset = 20f;
+            //_VRIK.solver.leftLeg.swivelOffset = -20f;
+            //_VRIK.solver.rightLeg.swivelOffset = 20f;
 
             _VRIK.solver.leftArm.shoulderRotationMode = IKSolverVR.Arm.ShoulderRotationMode.FromTo;
             _VRIK.solver.leftArm.shoulderRotationWeight = 0.3f;
@@ -564,11 +570,7 @@ namespace PMC
         {
             if (EnableMovement)
             {
-                var pos = Tracker.GlobalAvatarPosition;
-
-                pos.z *= -1f;
-
-                _root.localPosition = pos + _pelvisBasePosition;
+                _root.localPosition = Tracker.GlobalPosition + _pelvisBasePosition;
 
                 if (IKType == IKType.VRIK)
                 {
@@ -583,19 +585,33 @@ namespace PMC
 
         private void UpdateTarget()
         {
-            if (!Tracker.ActivePoseWorldLandmark) return;
+            if (!Tracker.ActivePoseLandmark || !Tracker.ActivePoseWorldLandmark) return;
+
+            _positions = Tracker.LocalPositions;
+
+            ApplyBoneConstraint(PoseLandmark.LeftShoulder, PoseLandmark.LeftElbow, _upperArmLeft);
+            ApplyBoneConstraint(PoseLandmark.LeftElbow, PoseLandmark.LeftWrist, _lowerArmLeft);
+
+            ApplyBoneConstraint(PoseLandmark.RightShoulder, PoseLandmark.RightElbow, _upperArmRight);
+            ApplyBoneConstraint(PoseLandmark.RightElbow, PoseLandmark.RightWrist, _lowerArmRight);
+
+            ApplyBoneConstraint(PoseLandmark.LeftHip, PoseLandmark.LeftKnee, _upperLegLeft);
+            ApplyBoneConstraint(PoseLandmark.LeftKnee, PoseLandmark.LeftAnkle, _lowerLegLeft);
+
+            ApplyBoneConstraint(PoseLandmark.RightHip, PoseLandmark.RightKnee, _upperLegRight);
+            ApplyBoneConstraint(PoseLandmark.RightKnee, PoseLandmark.RightAnkle, _lowerLegRight);
+
 
             var rotDelta = Time.deltaTime * RotationSmoothSpeed;
-
 
             // --------------------------------------------------
             // Body Rotation
             // --------------------------------------------------
 
-            var centerHipPosition = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftHip].Position + Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHip].Position) / 2f;
-            var centerShoulderPosition = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftShoulder].Position + Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightShoulder].Position) / 2f;
+            var centerHipPosition = (_positions[(int)PoseLandmark.LeftHip] + _positions[(int)PoseLandmark.RightHip]) / 2f;
+            var centerShoulderPosition = (_positions[(int)PoseLandmark.LeftShoulder] + _positions[(int)PoseLandmark.RightShoulder]) / 2f;
 
-            var bodyRightVector = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHip].Position - Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftHip].Position).normalized;
+            var bodyRightVector = (_positions[(int)PoseLandmark.RightHip] - _positions[(int)PoseLandmark.LeftHip]).normalized;
             var bodyUpVector = (centerShoulderPosition - centerHipPosition).normalized;
             var bodyForwardVector = Vector3.Cross(bodyRightVector, bodyUpVector).normalized;
 
@@ -608,10 +624,10 @@ namespace PMC
             // Head Rotation
             // --------------------------------------------------
 
-            var centerEyePosition = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftEye].Position + Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightEye].Position) / 2f;
-            var centerEarPosition = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftEar].Position + Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightEar].Position) / 2f;
+            var centerEyePosition = (_positions[(int)PoseLandmark.LeftEye] + _positions[(int)PoseLandmark.RightEye]) / 2f;
+            var centerEarPosition = (_positions[(int)PoseLandmark.LeftEar] + _positions[(int)PoseLandmark.RightEar]) / 2f;
 
-            var headRightVector = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightEar].Position - Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftEar].Position).normalized;
+            var headRightVector = (_positions[(int)PoseLandmark.RightEar] - _positions[(int)PoseLandmark.LeftEar]).normalized;
             var headForwardVector = (centerEyePosition - centerEarPosition).normalized;
             var headUpVector = Vector3.Cross(headForwardVector, headRightVector).normalized;
 
@@ -628,9 +644,9 @@ namespace PMC
 
             if (!Tracker.ActiveLeftHandWorldLandmark || !EnableHandTracking)
             {
-                var centerLeftHandPosition = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftIndex].Position + Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftPinky].Position) / 2f;
-                var leftHandForwardVector = (centerLeftHandPosition - Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftWrist].Position).normalized;
-                var leftHandRightVector = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftIndex].Position - Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftPinky].Position).normalized;
+                var centerLeftHandPosition = (_positions[(int)PoseLandmark.LeftIndex] + _positions[(int)PoseLandmark.LeftPinky]) / 2f;
+                var leftHandForwardVector = (centerLeftHandPosition - _positions[(int)PoseLandmark.LeftWrist]).normalized;
+                var leftHandRightVector = (_positions[(int)PoseLandmark.LeftIndex] - _positions[(int)PoseLandmark.LeftPinky]).normalized;
                 var leftHandUpVector = Vector3.Cross(leftHandForwardVector, leftHandRightVector).normalized;
 
                 targetLeftHandRotation = UnityUtils.LookRotation(leftHandForwardVector, leftHandUpVector) * Quaternion.Euler(HandRotationOffset);
@@ -656,9 +672,9 @@ namespace PMC
 
             if (!Tracker.ActiveRightHandWorldLandmark || !EnableHandTracking)
             {
-                var centerRightHandPosition = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightIndex].Position + Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightPinky].Position) / 2f;
-                var rightHandForwardVector = (centerRightHandPosition - Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightWrist].Position).normalized;
-                var rightHandRightVector = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightIndex].Position - Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightPinky].Position).normalized;
+                var centerRightHandPosition = (_positions[(int)PoseLandmark.RightIndex] + _positions[(int)PoseLandmark.RightPinky]) / 2f;
+                var rightHandForwardVector = (centerRightHandPosition - _positions[(int)PoseLandmark.RightWrist]).normalized;
+                var rightHandRightVector = (_positions[(int)PoseLandmark.RightIndex] - _positions[(int)PoseLandmark.RightPinky]).normalized;
                 var rightHandUpVector = Vector3.Cross(-rightHandForwardVector, rightHandRightVector).normalized;
 
                 targetRightHandRotation = UnityUtils.LookRotation(-rightHandForwardVector, rightHandUpVector) * Quaternion.Euler(HandRotationOffset);
@@ -680,8 +696,8 @@ namespace PMC
             // Foot Rotation
             // --------------------------------------------------
 
-            var leftFootForwardVector = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftFootIndex].Position - Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftHeel].Position).normalized;
-            var rightFootForwardVector = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightFootIndex].Position - Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHeel].Position).normalized;
+            var leftFootForwardVector = (_positions[(int)PoseLandmark.LeftFootIndex] - _positions[(int)PoseLandmark.LeftHeel]).normalized;
+            var rightFootForwardVector = (_positions[(int)PoseLandmark.RightFootIndex] - _positions[(int)PoseLandmark.RightHeel]).normalized;
 
             var targetLeftFootRotation = UnityUtils.LookRotation(leftFootForwardVector, Vector3.up);
             var targetRightFootRotation = UnityUtils.LookRotation(rightFootForwardVector, Vector3.up);
@@ -697,43 +713,45 @@ namespace PMC
             var posDelta = Time.deltaTime * PositionSmoothSpeed;
 
 
-            _headTarget.localPosition = Vector3.Lerp(_headTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.Nose].Position, posDelta);
+            _headTarget.localPosition = Vector3.Lerp(_headTarget.localPosition, _positions[(int)PoseLandmark.Nose], posDelta);
 
-            _leftHandTarget.localPosition = Vector3.Lerp(_leftHandTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftWrist].Position, posDelta);
-            _rightHandTarget.localPosition = Vector3.Lerp(_rightHandTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightWrist].Position, posDelta);
+            _leftHandTarget.localPosition = Vector3.Lerp(_leftHandTarget.localPosition, _positions[(int)PoseLandmark.LeftWrist], posDelta);
+            _rightHandTarget.localPosition = Vector3.Lerp(_rightHandTarget.localPosition, _positions[(int)PoseLandmark.RightWrist], posDelta);
 
-            _leftArmBendGoal.localPosition = Vector3.Lerp(_leftArmBendGoal.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftElbow].Position, posDelta);
-            _rightArmBendGoal.localPosition = Vector3.Lerp(_rightArmBendGoal.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightElbow].Position, posDelta);
+            _leftArmBendGoal.localPosition = Vector3.Lerp(_leftArmBendGoal.localPosition, _positions[(int)PoseLandmark.LeftElbow], posDelta);
+            _rightArmBendGoal.localPosition = Vector3.Lerp(_rightArmBendGoal.localPosition, _positions[(int)PoseLandmark.RightElbow], posDelta);
 
-            _leftShoulderTarget.localPosition = Vector3.Lerp(_leftShoulderTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftShoulder].Position, posDelta);
-            _rightShoulderTarget.localPosition = Vector3.Lerp(_rightShoulderTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightShoulder].Position, posDelta);
+            _leftShoulderTarget.localPosition = Vector3.Lerp(_leftShoulderTarget.localPosition, _positions[(int)PoseLandmark.LeftShoulder], posDelta);
+            _rightShoulderTarget.localPosition = Vector3.Lerp(_rightShoulderTarget.localPosition, _positions[(int)PoseLandmark.RightShoulder], posDelta);
 
-            _leftFootTarget.localPosition = Vector3.Lerp(_leftFootTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftHeel].Position, posDelta);
-            _rightFootTarget.localPosition = Vector3.Lerp(_rightFootTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHeel].Position, posDelta);
+            _leftFootTarget.localPosition = Vector3.Lerp(_leftFootTarget.localPosition, _positions[(int)PoseLandmark.LeftHeel], posDelta);
+            _rightFootTarget.localPosition = Vector3.Lerp(_rightFootTarget.localPosition, _positions[(int)PoseLandmark.RightHeel], posDelta);
 
-            _leftLegBendGoal.localPosition = Vector3.Lerp(_leftLegBendGoal.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftKnee].Position, posDelta);
-            _rightLegBendGoal.localPosition = Vector3.Lerp(_rightLegBendGoal.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightKnee].Position, posDelta);
+            _leftLegBendGoal.localPosition = Vector3.Lerp(_leftLegBendGoal.localPosition, _positions[(int)PoseLandmark.LeftKnee], posDelta);
+            _rightLegBendGoal.localPosition = Vector3.Lerp(_rightLegBendGoal.localPosition, _positions[(int)PoseLandmark.RightKnee], posDelta);
 
-            _leftThighTarget.localPosition = Vector3.Lerp(_leftThighTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftHip].Position, posDelta);
-            _rightThighTarget.localPosition = Vector3.Lerp(_rightThighTarget.localPosition, Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHip].Position, posDelta);
+            _leftThighTarget.localPosition = Vector3.Lerp(_leftThighTarget.localPosition, _positions[(int)PoseLandmark.LeftHip], posDelta);
+            _rightThighTarget.localPosition = Vector3.Lerp(_rightThighTarget.localPosition, _positions[(int)PoseLandmark.RightHip], posDelta);
 
             var chestPosition = (
-                Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftShoulder].Position +
-                Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightShoulder].Position) * 0.5f;
+                _positions[(int)PoseLandmark.LeftShoulder] +
+                _positions[(int)PoseLandmark.RightShoulder]) * 0.5f;
 
             _chestGoal.localPosition = Vector3.Lerp(_chestGoal.localPosition, chestPosition, posDelta);
         }
 
         private void UpdateVRIK()
         {
-            if (!Tracker.ActivePoseWorldLandmark) return;
+            if (!Tracker.ActivePoseLandmark || !Tracker.ActivePoseWorldLandmark) return;
 
             if (AutoWeight)
             {
                 var targetLeftLegWeight = Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility ?? 0f;
                 var targetRightLegWeight = Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility ?? 0f;
-                var targetLeftBendWeight = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftKnee].Visibility * Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility) ?? 0f;
-                var targetRightBendWeight = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightKnee].Visibility * Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility) ?? 0f;
+                var targetLeftBendWeight = Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftKnee].Visibility ?? 0f;
+                //var targetLeftBendWeight = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftKnee].Visibility * Tracker.PoseWorldLandmarks[(int)PoseLandmark.LeftHeel].Visibility) ?? 0f;
+                var targetRightBendWeight = Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightKnee].Visibility ?? 0f;
+                //var targetRightBendWeight = (Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightKnee].Visibility * Tracker.PoseWorldLandmarks[(int)PoseLandmark.RightHeel].Visibility) ?? 0f;
 
                 var lerpDelta = Time.deltaTime * WeightSmoothingSpeed;
 
@@ -796,7 +814,7 @@ namespace PMC
 
         private void UpdateFBBIK()
         {
-            if (!Tracker.ActivePoseWorldLandmark) return;
+            if (!Tracker.ActivePoseLandmark || !Tracker.ActivePoseWorldLandmark) return;
 
             if (AutoWeight)
             {
@@ -1158,7 +1176,28 @@ namespace PMC
             }
         }
 
-        private static float CalculateBlinkValueFromARKit(float arkitScore, float openedThreshold, float closedThreshold)
+        private void ApplyBoneConstraint(PoseLandmark parent, PoseLandmark child, float targetLen)
+        {
+            var direction = _positions[(int)child] - _positions[(int)parent];
+
+            float currentLen = direction.magnitude;
+
+            if (currentLen < 1e-5f) return;
+
+            _positions[(int)child] = _positions[(int)parent] + (direction.normalized * targetLen);
+        }
+
+        private float GetBoneLength(HumanBodyBones a, HumanBodyBones b)
+        {
+            var ta = _animator.GetBoneTransform(a);
+            var tb = _animator.GetBoneTransform(b);
+
+            if (ta == null || tb == null) return 0f;
+
+            return Vector3.Distance(ta.position, tb.position);
+        }
+
+        private float CalculateBlinkValueFromARKit(float arkitScore, float openedThreshold, float closedThreshold)
         {
             if (arkitScore >= openedThreshold)
             {
