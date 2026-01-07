@@ -11,6 +11,7 @@ Unityで高精度なモーションキャプチャーを実現することがで
 - Unity 2022.3 以降
 - FinalIK (有料アセット)
 - MediaPipeUnityPlugin
+- UniVRM (VRM 1.0)
 
 ### インストール
 
@@ -43,6 +44,10 @@ Unityで高精度なモーションキャプチャーを実現することがで
 バージョン<b>0.16.3</b>以上をサポートしています。（常に最新のバージョンを使用することをおすすめします）<br>
 
 GitHubの[リリースページ](https://github.com/homuler/MediaPipeUnityPlugin/releases)から、最新の.unitypackageファイルをダウンロードし、Unityにインポートします。<br>
+
+[<b>UniVRM</b>](https://github.com/vrm-c/UniVRM)
+
+詳しくはUniVRMのインストール方法をご確認ください。
 
 ## 使い方
 
