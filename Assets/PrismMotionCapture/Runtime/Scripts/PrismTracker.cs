@@ -27,6 +27,8 @@ namespace PMC
         public TextAsset ModelAsset;
         public ImageReadMode ImageReadMode = ImageReadMode.CPU;
 
+        public float FOV = 60f;
+
         [Range(1f, 60f)] public float Framerate = 30f;
         private float _trackingFPS = 0f;
         private long _lastFrameTick = 0;
@@ -40,7 +42,6 @@ namespace PMC
         [Range(0f, 1f)] public float MinHandLandmarksConfidence = 0.5f;
         public bool OutputFaceBlendshapes = true;
         public bool OutputSegmentationMask = false;
-
         public bool FlipHorizontally = false;
         public bool FlipVertically = false;
 
@@ -54,10 +55,6 @@ namespace PMC
         [SerializeField] private float _filterMinCutoff = 1f;
         [SerializeField] private float _filterBeta = 0.1f;
         [SerializeField] private float _filterDcutoff = 1f;
-        [SerializeField] private bool _enableGlobalPoseFilter = true;
-        [SerializeField] private float _globalPoseFilterMinCutoff = 1f;
-        [SerializeField] private float _globalPoseFilterBeta = 0.1f;
-        [SerializeField] private float _globalPoseFilterDcutoff = 1f;
 
         public bool ShowTrackingFPS = true;
         public bool ShowLandmark = true;
@@ -81,26 +78,22 @@ namespace PMC
         private Mat _pnpObjectPointMat;
         private Mat _pnpCamSpacePointMat;
 
-        private Matrix4x4 _invertYM;
-        private Matrix4x4 _invertZM;
-
         private bool _initialized = false;
-
-        private OneEuroFilter<Vector3> _globalAvatarPositionOneEuroFilter;
-
 
         private readonly List<Point3f> _objectPointsList = new();
         private readonly List<Point2f> _imagePointsList = new();
 
         private readonly int[] _pnpLandmarkIndices = new int[]
         {
+            (int)PoseLandmark.Nose,
             (int)PoseLandmark.LeftShoulder,
             (int)PoseLandmark.RightShoulder,
             (int)PoseLandmark.LeftHip,
             (int)PoseLandmark.RightHip,
         };
 
-        private readonly Vector3[] _positions = new Vector3[PoseLandmarkCount];
+        public KalmanFilter[] KalmanFilters = new KalmanFilter[PoseLandmarkCount];
+        public OneEuroFilter<Vector3>[] OneEuroFilters = new OneEuroFilter<Vector3>[PoseLandmarkCount];
 
         private static readonly HashSet<int> _LeftLandmarks = new() { 1, 2, 3, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31 };
         private static readonly HashSet<int> _RightLandmarks = new() { 4, 5, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32 };
@@ -154,7 +147,11 @@ namespace PMC
 
         public float[] FaceBlendShapes { get; private set; } = new float[FaceBlendShapeCount];
 
-        public Vector3 GlobalAvatarPosition { get; private set; }
+        public Vector3[] GlobalPositions { get; set; } = new Vector3[PoseLandmarkCount];
+
+        public Vector3[] LocalPositions { get; set; } = new Vector3[PoseLandmarkCount];
+
+        public Vector3 GlobalPosition { get; set; } = Vector3.zero;
 
 
         // Methods
@@ -191,8 +188,41 @@ namespace PMC
 
             _stopwatch = Stopwatch.StartNew();
 
-            InitializeFilter();
-            InitializePnP();
+            var f_val = ImageSource.Resolution.y / (2f * Mathf.Tan(0.5f * FOV * Mathf.Deg2Rad));
+
+            _fx = f_val;
+            _fy = f_val;
+            _cx = ImageSource.Resolution.x / 2f;
+            _cy = ImageSource.Resolution.y / 2f;
+
+            _camMatrix = new Mat(3, 3, MatType.CV_64FC1);
+            _camMatrix.Set(0, 0, _fx);
+            _camMatrix.Set(0, 1, 0d);
+            _camMatrix.Set(0, 2, _cx);
+            _camMatrix.Set(1, 0, 0d);
+            _camMatrix.Set(1, 1, _fy);
+            _camMatrix.Set(1, 2, _cy);
+            _camMatrix.Set(2, 0, 0d);
+            _camMatrix.Set(2, 1, 0d);
+            _camMatrix.Set(2, 2, 1.0d);
+
+            _distCoeffs = new Mat(4, 1, MatType.CV_64FC1);
+            _distCoeffs.SetTo(Scalar.All(0));
+
+            _rvec = new Mat(3, 1, MatType.CV_64FC1);
+            _tvec = new Mat(3, 1, MatType.CV_64FC1);
+            _rotationMatrix = new Mat(3, 3, MatType.CV_64FC1);
+            _pnpObjectPointMat = new Mat(3, 1, MatType.CV_64FC1);
+            _pnpCamSpacePointMat = new Mat(3, 1, MatType.CV_64FC1);
+
+            for (int i = 0; i < PoseLandmarkCount; i++)
+            {
+                KalmanFilters[i] = new KalmanFilter();
+                KalmanFilters[i].SetParameter(_timeInterval, _noise);
+                KalmanFilters[i].Predict();
+
+                OneEuroFilters[i] = new OneEuroFilter<Vector3>(Framerate, _filterMinCutoff, _filterBeta, _filterDcutoff);
+            }
 
             _initialized = true;
         }
@@ -308,8 +338,7 @@ namespace PMC
 
             if (ShowLandmark)
             {
-                //var positions = PoseWorldLandmarks.Select(t => t.Position).ToArray();
-                var positions = _positions;
+                var positions = LocalPositions;
 
                 if (positions == null) return;
 
@@ -356,56 +385,40 @@ namespace PMC
             _pnpCamSpacePointMat?.Dispose();
         }
 
-        private void InitializeFilter()
+        private void ResultCallback(in HolisticLandmarkerResult holisticLandmarkerResult, Image image, long timestampMillisec)
         {
-            foreach (var landmark in PoseWorldLandmarks)
-            {
-                if (_enableKalmanFilter)
-                {
-                    landmark.KalmanFilter = new KalmanFilter();
-                    landmark.KalmanFilter.SetParameter(_timeInterval, _noise);
-                    landmark.KalmanFilter.Predict();
-                }
+            ActiveFaceLandmark = Set(FaceLandmarks, holisticLandmarkerResult.faceLandmarks.landmarks);
+            ActivePoseLandmark = Set(PoseLandmarks, holisticLandmarkerResult.poseLandmarks.landmarks);
+            ActivePoseWorldLandmark = Set(PoseWorldLandmarks, holisticLandmarkerResult.poseWorldLandmarks.landmarks);
+            ActiveLeftHandLandmark = Set(LeftHandLandmarks, holisticLandmarkerResult.leftHandLandmarks.landmarks);
+            ActiveLeftHandWorldLandmark = Set(LeftHandWorldLandmarks, holisticLandmarkerResult.leftHandWorldLandmarks.landmarks);
+            ActiveRightHandLandmark = Set(RightHandLandmarks, holisticLandmarkerResult.rightHandLandmarks.landmarks);
+            ActiveRightHandWorldLandmark = Set(RightHandWorldLandmarks, holisticLandmarkerResult.rightHandWorldLandmarks.landmarks);
+            ActiveFaceBlendShapes = holisticLandmarkerResult.faceBlendshapes.categories != null && holisticLandmarkerResult.faceBlendshapes.categories.Count > 0;
 
-                if (_enableOneEuroFilter)
+            if (ActiveFaceBlendShapes)
+            {
+                for (int i = 0; i < FaceBlendShapes.Length; i++)
                 {
-                    landmark.OneEuroFilter = new OneEuroFilter<Vector3>(Framerate, _filterMinCutoff, _filterBeta, _filterDcutoff);
+                    FaceBlendShapes[i] = holisticLandmarkerResult.faceBlendshapes.categories[i].score;
                 }
             }
 
-            _globalAvatarPositionOneEuroFilter = new OneEuroFilter<Vector3>(Framerate, _globalPoseFilterMinCutoff, _globalPoseFilterBeta, _globalPoseFilterDcutoff);
-        }
+            UpdatePnP(holisticLandmarkerResult);
 
-        private void InitializePnP()
-        {
-            var max_d = Mathf.Max(ImageSource.Resolution.x, ImageSource.Resolution.y);
-            _fx = max_d;
-            _fy = max_d;
-            _cx = ImageSource.Resolution.x / 2f;
-            _cy = ImageSource.Resolution.y / 2f;
+            var currentTick = _stopwatch.ElapsedTicks;
 
-            _camMatrix = new Mat(3, 3, MatType.CV_64FC1);
-            _camMatrix.Set(0, 0, _fx);
-            _camMatrix.Set(0, 1, 0d);
-            _camMatrix.Set(0, 2, _cx);
-            _camMatrix.Set(1, 0, 0d);
-            _camMatrix.Set(1, 1, _fy);
-            _camMatrix.Set(1, 2, _cy);
-            _camMatrix.Set(2, 0, 0d);
-            _camMatrix.Set(2, 1, 0d);
-            _camMatrix.Set(2, 2, 1.0d);
+            if (_lastFrameTick != 0)
+            {
+                var elapsedSeconds = (float)(currentTick - _lastFrameTick) / Stopwatch.Frequency;
 
-            _distCoeffs = new Mat(4, 1, MatType.CV_64FC1);
-            _distCoeffs.SetTo(Scalar.All(0));
+                if (elapsedSeconds > 0)
+                {
+                    _trackingFPS = 1f / elapsedSeconds;
+                }
+            }
 
-            _rvec = new Mat(3, 1, MatType.CV_64FC1);
-            _tvec = new Mat(3, 1, MatType.CV_64FC1);
-            _rotationMatrix = new Mat(3, 3, MatType.CV_64FC1);
-            _pnpObjectPointMat = new Mat(3, 1, MatType.CV_64FC1);
-            _pnpCamSpacePointMat = new Mat(3, 1, MatType.CV_64FC1);
-
-            _invertYM = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(1, -1, 1));
-            _invertZM = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(1, 1, -1));
+            _lastFrameTick = currentTick;
         }
 
         private void UpdatePnP(HolisticLandmarkerResult result)
@@ -433,7 +446,7 @@ namespace PMC
                 _tvec,
                 true,
                 100,
-                8f,
+                4f,
                 0.99,
                 null,
                 SolvePnPFlags.Iterative);
@@ -455,67 +468,27 @@ namespace PMC
                 var x = (float)(((p2d.x * ImageSource.Resolution.x) - _cx) * z / _fx);
                 var y = (float)(((p2d.y * ImageSource.Resolution.y) - _cy) * z / _fy);
 
-                _positions[i] = new Vector3(x, y, 0);
-            }
+                GlobalPositions[i] = new Vector3(x, y, z);
 
-            var hipCenterPos = (_positions[(int)PoseLandmark.LeftHip] + _positions[(int)PoseLandmark.RightHip]) / 2f;
-
-            GlobalAvatarPosition = Vector3.Scale(hipCenterPos, MovementScale);
-
-            if (_enableGlobalPoseFilter)
-            {
-                GlobalAvatarPosition = _globalAvatarPositionOneEuroFilter.Filter(GlobalAvatarPosition, (float)_stopwatch.Elapsed.TotalSeconds);
-            }
-        }
-
-        private void ResultCallback(in HolisticLandmarkerResult holisticLandmarkerResult, Image image, long timestampMillisec)
-        {
-            ActiveFaceLandmark = Set(FaceLandmarks, holisticLandmarkerResult.faceLandmarks.landmarks);
-            ActivePoseLandmark = Set(PoseLandmarks, holisticLandmarkerResult.poseLandmarks.landmarks);
-            ActivePoseWorldLandmark = Set(PoseWorldLandmarks, holisticLandmarkerResult.poseWorldLandmarks.landmarks);
-            ActiveLeftHandLandmark = Set(LeftHandLandmarks, holisticLandmarkerResult.leftHandLandmarks.landmarks);
-            ActiveLeftHandWorldLandmark = Set(LeftHandWorldLandmarks, holisticLandmarkerResult.leftHandWorldLandmarks.landmarks);
-            ActiveRightHandLandmark = Set(RightHandLandmarks, holisticLandmarkerResult.rightHandLandmarks.landmarks);
-            ActiveRightHandWorldLandmark = Set(RightHandWorldLandmarks, holisticLandmarkerResult.rightHandWorldLandmarks.landmarks);
-            ActiveFaceBlendShapes = holisticLandmarkerResult.faceBlendshapes.categories != null && holisticLandmarkerResult.faceBlendshapes.categories.Count > 0;
-
-            UpdatePnP(holisticLandmarkerResult);
-
-            if (ActiveFaceBlendShapes)
-            {
-                for (int i = 0; i < FaceBlendShapes.Length; i++)
-                {
-                    FaceBlendShapes[i] = holisticLandmarkerResult.faceBlendshapes.categories[i].score;
-                }
-            }
-
-            foreach (var landmark in PoseWorldLandmarks)
-            {
                 if (_enableKalmanFilter)
                 {
-                    landmark.Position = landmark.KalmanFilter.Update(landmark.Position);
+                    GlobalPositions[i] = KalmanFilters[i].Update(GlobalPositions[i]);
                 }
 
                 if (_enableOneEuroFilter)
                 {
-                    landmark.Position = landmark.OneEuroFilter.Filter(landmark.Position, (float)_stopwatch.Elapsed.TotalSeconds);
+                    GlobalPositions[i] = OneEuroFilters[i].Filter(GlobalPositions[i], (float)_stopwatch.Elapsed.TotalSeconds);
                 }
             }
 
+            GlobalPosition = (GlobalPositions[(int)PoseLandmark.LeftHip] + GlobalPositions[(int)PoseLandmark.RightHip]) / 2f;
 
-            var currentTick = _stopwatch.ElapsedTicks;
-
-            if (_lastFrameTick != 0)
+            for (int i = 0; i < LocalPositions.Length; i++)
             {
-                var elapsedSeconds = (float)(currentTick - _lastFrameTick) / Stopwatch.Frequency;
-
-                if (elapsedSeconds > 0)
-                {
-                    _trackingFPS = 1f / elapsedSeconds;
-                }
+                LocalPositions[i] = Vector3.Scale(GlobalPositions[i] - GlobalPosition, LandmarkScale);
             }
 
-            _lastFrameTick = currentTick;
+            GlobalPosition = Vector3.Scale(GlobalPosition, MovementScale);
         }
 
         private bool Set(Landmark[] landmarks, List<Mediapipe.Tasks.Components.Containers.NormalizedLandmark> normalizedLandmarks)

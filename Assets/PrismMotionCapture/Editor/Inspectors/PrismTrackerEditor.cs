@@ -30,10 +30,6 @@ namespace PMC.Editor
         private SerializedProperty _filterMinCutoff;
         private SerializedProperty _filterBeta;
         private SerializedProperty _filterDcutoff;
-        private SerializedProperty _enableGlobalPoseFilter;
-        private SerializedProperty _globalPoseFilterMinCutoff;
-        private SerializedProperty _globalPoseFilterBeta;
-        private SerializedProperty _globalPoseFilterDcutoff;
         private SerializedProperty ShowTrackingFPS;
         private SerializedProperty ShowLandmark;
         private SerializedProperty LandmarkRadius;
@@ -72,10 +68,6 @@ namespace PMC.Editor
             _filterMinCutoff = serializedObject.FindProperty(nameof(_filterMinCutoff));
             _filterBeta = serializedObject.FindProperty(nameof(_filterBeta));
             _filterDcutoff = serializedObject.FindProperty(nameof(_filterDcutoff));
-            _enableGlobalPoseFilter = serializedObject.FindProperty(nameof(_enableGlobalPoseFilter));
-            _globalPoseFilterMinCutoff = serializedObject.FindProperty(nameof(_globalPoseFilterMinCutoff));
-            _globalPoseFilterBeta = serializedObject.FindProperty(nameof(_globalPoseFilterBeta));
-            _globalPoseFilterDcutoff = serializedObject.FindProperty(nameof(_globalPoseFilterDcutoff));
             ShowTrackingFPS = serializedObject.FindProperty(nameof(ShowTrackingFPS));
             ShowLandmark = serializedObject.FindProperty(nameof(ShowLandmark));
             LandmarkRadius = serializedObject.FindProperty(nameof(LandmarkRadius));
@@ -87,6 +79,8 @@ namespace PMC.Editor
 
         public override void OnInspectorGUI()
         {
+            var instance = (PrismTracker)target;
+
             serializedObject.Update();
 
             EditorGUILayout.BeginVertical("box");
@@ -148,8 +142,18 @@ namespace PMC.Editor
 
                     using (new EditorGUI.DisabledGroupScope(!_enableKalmanFilter.boolValue))
                     {
+                        EditorGUI.BeginChangeCheck();
+
                         EditorGUILayout.PropertyField(_timeInterval);
                         EditorGUILayout.PropertyField(_noise);
+
+                        if (EditorGUI.EndChangeCheck() && Application.isPlaying)
+                        {
+                            foreach (var kalmanFilter in instance.KalmanFilters)
+                            {
+                                kalmanFilter.SetParameter(_timeInterval.doubleValue, _noise.doubleValue);
+                            }
+                        }
                     }
 
                     EditorGUILayout.Space();
@@ -157,21 +161,23 @@ namespace PMC.Editor
 
                     using (new EditorGUI.DisabledGroupScope(!_enableOneEuroFilter.boolValue))
                     {
+                        EditorGUI.BeginChangeCheck();
+
                         EditorGUILayout.PropertyField(_filterMinCutoff);
                         EditorGUILayout.PropertyField(_filterBeta);
                         EditorGUILayout.PropertyField(_filterDcutoff);
-                    }
 
-                    EditorGUILayout.EndVertical();
-                    EditorGUILayout.Space();
-                    EditorGUILayout.BeginVertical("box");
-                    EditorGUILayout.PropertyField(_enableGlobalPoseFilter);
-
-                    using (new EditorGUI.DisabledGroupScope(!_enableGlobalPoseFilter.boolValue))
-                    {
-                        EditorGUILayout.PropertyField(_globalPoseFilterMinCutoff);
-                        EditorGUILayout.PropertyField(_globalPoseFilterBeta);
-                        EditorGUILayout.PropertyField(_globalPoseFilterDcutoff);
+                        if (EditorGUI.EndChangeCheck() && Application.isPlaying)
+                        {
+                            foreach (var oneEuroFilter in instance.OneEuroFilters)
+                            {
+                                oneEuroFilter.UpdateParams(
+                                    Framerate.floatValue,
+                                    _filterMinCutoff.floatValue,
+                                    _filterBeta.floatValue,
+                                    _filterDcutoff.floatValue);
+                            }
+                        }
                     }
 
                     EditorGUILayout.EndVertical();
