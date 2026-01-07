@@ -10,6 +10,7 @@ namespace PMC.Editor
         private SerializedProperty ImageSource;
         private SerializedProperty ImageReadMode;
         private SerializedProperty Framerate;
+        private SerializedProperty FOV;
         private SerializedProperty MinFaceDetectionConfidence;
         private SerializedProperty MinFaceSuppressionThreshold;
         private SerializedProperty MinFaceLandmarksConfidence;
@@ -48,6 +49,7 @@ namespace PMC.Editor
             ImageSource = serializedObject.FindProperty(nameof(ImageSource));
             ImageReadMode = serializedObject.FindProperty(nameof(ImageReadMode));
             Framerate = serializedObject.FindProperty(nameof(Framerate));
+            FOV = serializedObject.FindProperty(nameof(FOV));
             MinFaceDetectionConfidence = serializedObject.FindProperty(nameof(MinFaceDetectionConfidence));
             MinFaceSuppressionThreshold = serializedObject.FindProperty(nameof(MinFaceSuppressionThreshold));
             MinFaceLandmarksConfidence = serializedObject.FindProperty(nameof(MinFaceLandmarksConfidence));
@@ -87,6 +89,7 @@ namespace PMC.Editor
             EditorGUILayout.PropertyField(ImageSource);
             EditorGUILayout.PropertyField(ImageReadMode);
             EditorGUILayout.PropertyField(Framerate);
+            EditorGUILayout.PropertyField(FOV);
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space();
 

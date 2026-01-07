@@ -27,11 +27,11 @@ namespace PMC
         public TextAsset ModelAsset;
         public ImageReadMode ImageReadMode = ImageReadMode.CPU;
 
-        public float FOV = 60f;
-
         [Range(1f, 60f)] public float Framerate = 30f;
         private float _trackingFPS = 0f;
         private long _lastFrameTick = 0;
+
+        public float FOV = 60f;
 
         [Range(0f, 1f)] public float MinFaceDetectionConfidence = 0.5f;
         [Range(0f, 1f)] public float MinFaceSuppressionThreshold = 0.5f;
