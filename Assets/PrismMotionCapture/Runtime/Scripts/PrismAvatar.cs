@@ -44,7 +44,7 @@ namespace PMC
 
         public bool EnableGaze = true;
         [Range(0f, 1f)] public float GazeSmoothing = 0.6f;
-        [Range(0f, 1f)] public float GazeStrength = 1f;
+        public float GazeStrength = 1f;
 
         public bool EnableMouth = true;
         [Range(0f, 2f)] public float MouthOpenSensitivity = 1f;
@@ -1043,7 +1043,7 @@ namespace PMC
             _gazeInterpolate.UpdateTime(Time.timeAsDouble);
 
             var lookUpDown = _currentLookUp - _currentLookDown;
-            var lookLeftRight = _currentLookRight - _currentLookLeft;
+            var lookLeftRight = _currentLookLeft - _currentLookRight;
 
             _vrm.Runtime.LookAt.SetYawPitchManually(GazeStrength * lookLeftRight, GazeStrength * lookUpDown);
         }
