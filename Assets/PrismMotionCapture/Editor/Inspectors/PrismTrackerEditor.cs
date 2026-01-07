@@ -22,7 +22,10 @@ namespace PMC.Editor
         private SerializedProperty OutputSegmentationMask;
         private SerializedProperty FlipHorizontally;
         private SerializedProperty FlipVertically;
-        private SerializedProperty LandmarkScale;
+        private SerializedProperty FaceScale;
+        private SerializedProperty PoseScale;
+        private SerializedProperty LeftHandScale;
+        private SerializedProperty RightHandScale;
         private SerializedProperty MovementScale;
         private SerializedProperty _enableKalmanFilter;
         private SerializedProperty _timeInterval;
@@ -61,7 +64,10 @@ namespace PMC.Editor
             OutputSegmentationMask = serializedObject.FindProperty(nameof(OutputSegmentationMask));
             FlipHorizontally = serializedObject.FindProperty(nameof(FlipHorizontally));
             FlipVertically = serializedObject.FindProperty(nameof(FlipVertically));
-            LandmarkScale = serializedObject.FindProperty(nameof(LandmarkScale));
+            FaceScale = serializedObject.FindProperty(nameof(FaceScale));
+            PoseScale = serializedObject.FindProperty(nameof(PoseScale));
+            LeftHandScale = serializedObject.FindProperty(nameof(LeftHandScale));
+            RightHandScale = serializedObject.FindProperty(nameof(RightHandScale));
             MovementScale = serializedObject.FindProperty(nameof(MovementScale));
             _enableKalmanFilter = serializedObject.FindProperty(nameof(_enableKalmanFilter));
             _timeInterval = serializedObject.FindProperty(nameof(_timeInterval));
@@ -126,7 +132,10 @@ namespace PMC.Editor
             if (_trackingSettingsFoldout)
             {
                 EditorGUILayout.BeginVertical("box");
-                EditorGUILayout.PropertyField(LandmarkScale);
+                EditorGUILayout.PropertyField(FaceScale);
+                EditorGUILayout.PropertyField(PoseScale);
+                EditorGUILayout.PropertyField(LeftHandScale);
+                EditorGUILayout.PropertyField(RightHandScale);
                 EditorGUILayout.PropertyField(MovementScale);
                 EditorGUILayout.EndVertical();
             }

@@ -45,7 +45,10 @@ namespace PMC
         public bool FlipHorizontally = false;
         public bool FlipVertically = false;
 
-        public Vector3 LandmarkScale = Vector3.one;
+        public Vector3 FaceScale = Vector3.one;
+        public Vector3 PoseScale = Vector3.one;
+        public Vector3 LeftHandScale = Vector3.one;
+        public Vector3 RightHandScale = Vector3.one;
         public Vector3 MovementScale = Vector3.one;
 
         [SerializeField] private bool _enableKalmanFilter = true;
@@ -387,13 +390,13 @@ namespace PMC
 
         private void ResultCallback(in HolisticLandmarkerResult holisticLandmarkerResult, Image image, long timestampMillisec)
         {
-            ActiveFaceLandmark = Set(FaceLandmarks, holisticLandmarkerResult.faceLandmarks.landmarks);
-            ActivePoseLandmark = Set(PoseLandmarks, holisticLandmarkerResult.poseLandmarks.landmarks);
-            ActivePoseWorldLandmark = Set(PoseWorldLandmarks, holisticLandmarkerResult.poseWorldLandmarks.landmarks);
-            ActiveLeftHandLandmark = Set(LeftHandLandmarks, holisticLandmarkerResult.leftHandLandmarks.landmarks);
-            ActiveLeftHandWorldLandmark = Set(LeftHandWorldLandmarks, holisticLandmarkerResult.leftHandWorldLandmarks.landmarks);
-            ActiveRightHandLandmark = Set(RightHandLandmarks, holisticLandmarkerResult.rightHandLandmarks.landmarks);
-            ActiveRightHandWorldLandmark = Set(RightHandWorldLandmarks, holisticLandmarkerResult.rightHandWorldLandmarks.landmarks);
+            ActiveFaceLandmark = Set(FaceLandmarks, holisticLandmarkerResult.faceLandmarks.landmarks, FaceScale);
+            ActivePoseLandmark = Set(PoseLandmarks, holisticLandmarkerResult.poseLandmarks.landmarks, PoseScale);
+            ActivePoseWorldLandmark = Set(PoseWorldLandmarks, holisticLandmarkerResult.poseWorldLandmarks.landmarks, PoseScale);
+            ActiveLeftHandLandmark = Set(LeftHandLandmarks, holisticLandmarkerResult.leftHandLandmarks.landmarks, LeftHandScale);
+            ActiveLeftHandWorldLandmark = Set(LeftHandWorldLandmarks, holisticLandmarkerResult.leftHandWorldLandmarks.landmarks, LeftHandScale);
+            ActiveRightHandLandmark = Set(RightHandLandmarks, holisticLandmarkerResult.rightHandLandmarks.landmarks, RightHandScale);
+            ActiveRightHandWorldLandmark = Set(RightHandWorldLandmarks, holisticLandmarkerResult.rightHandWorldLandmarks.landmarks, RightHandScale);
             ActiveFaceBlendShapes = holisticLandmarkerResult.faceBlendshapes.categories != null && holisticLandmarkerResult.faceBlendshapes.categories.Count > 0;
 
             if (ActiveFaceBlendShapes)
@@ -485,13 +488,13 @@ namespace PMC
 
             for (int i = 0; i < LocalPositions.Length; i++)
             {
-                LocalPositions[i] = Vector3.Scale(GlobalPositions[i] - GlobalPosition, LandmarkScale);
+                LocalPositions[i] = Vector3.Scale(GlobalPositions[i] - GlobalPosition, PoseScale);
             }
 
             GlobalPosition = Vector3.Scale(GlobalPosition, MovementScale);
         }
 
-        private bool Set(Landmark[] landmarks, List<Mediapipe.Tasks.Components.Containers.NormalizedLandmark> normalizedLandmarks)
+        private bool Set(Landmark[] landmarks, List<Mediapipe.Tasks.Components.Containers.NormalizedLandmark> normalizedLandmarks, Vector3 scale)
         {
             if (normalizedLandmarks == null || normalizedLandmarks.Count == 0) return false;
 
@@ -499,13 +502,13 @@ namespace PMC
             {
                 landmarks[i].Set(normalizedLandmarks[i]);
 
-                landmarks[i].Position = Vector3.Scale(landmarks[i].Position, LandmarkScale);
+                landmarks[i].Position = Vector3.Scale(landmarks[i].Position, scale);
             }
 
             return true;
         }
 
-        private bool Set(Landmark[] landmarks, List<Mediapipe.Tasks.Components.Containers.Landmark> normalizedLandmarks)
+        private bool Set(Landmark[] landmarks, List<Mediapipe.Tasks.Components.Containers.Landmark> normalizedLandmarks, Vector3 scale)
         {
             if (normalizedLandmarks == null || normalizedLandmarks.Count == 0) return false;
 
@@ -513,7 +516,7 @@ namespace PMC
             {
                 landmarks[i].Set(normalizedLandmarks[i]);
 
-                landmarks[i].Position = Vector3.Scale(landmarks[i].Position, LandmarkScale);
+                landmarks[i].Position = Vector3.Scale(landmarks[i].Position, scale);
             }
 
             return normalizedLandmarks != null;

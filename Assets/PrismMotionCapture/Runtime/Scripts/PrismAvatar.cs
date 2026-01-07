@@ -1025,8 +1025,6 @@ namespace PMC
             var targetLookLeft = (Tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookInLeft] + Tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookOutRight]) / 2f;
             var targetLookRight = (Tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookOutLeft] + Tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookInRight]) / 2f;
 
-            var t = _gazeInterpolate.Interpolate();
-
             var smoothedLookUp = Mathf.Lerp(_lastLookUp, targetLookUp, 1f - GazeSmoothing);
             var smoothedLookDown = Mathf.Lerp(_lastLookDown, targetLookDown, 1f - GazeSmoothing);
             var smoothedLookLeft = Mathf.Lerp(_lastLookLeft, targetLookLeft, 1f - GazeSmoothing);
@@ -1053,8 +1051,6 @@ namespace PMC
         private void UpdateMouth()
         {
             if (!EnableMouth || !Tracker.ActiveFaceBlendShapes) return;
-
-            var t = _mouthInterpolate.Interpolate();
 
             var mouthOpen = Tracker.FaceBlendShapes[(int)FaceBlendShapes.JawOpen] * MouthOpenSensitivity;
             var au = Mathf.Lerp(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Aa), mouthOpen, 1f - MouthSmoothing);
