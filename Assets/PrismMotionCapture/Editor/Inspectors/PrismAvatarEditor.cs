@@ -72,6 +72,8 @@ namespace PMC.Editor
 
         public override void OnInspectorGUI()
         {
+            var instance = target as PrismAvatar;
+
             serializedObject.Update();
 
             EditorGUILayout.BeginVertical("box");
@@ -107,73 +109,79 @@ namespace PMC.Editor
 
             EditorGUILayout.Space();
 
-            _faceSettingsFoldout = EditorGUILayout.Foldout(_faceSettingsFoldout, "Face Tracking", true);
-
-            if (_faceSettingsFoldout)
+            if (instance.EnableVRM)
             {
-                using (new EditorGUI.IndentLevelScope())
+                _faceSettingsFoldout = EditorGUILayout.Foldout(_faceSettingsFoldout, "Face Tracking", true);
+
+                if (_faceSettingsFoldout)
                 {
-                    EditorGUILayout.BeginVertical("box");
-
-                    _eyeBlinkSettingsFoldout = EditorGUILayout.Foldout(_eyeBlinkSettingsFoldout, "Blink", true);
-
-                    if (_eyeBlinkSettingsFoldout)
+                    using (new EditorGUI.IndentLevelScope())
                     {
-                        EditorGUILayout.PropertyField(EnableBlink);
+                        EditorGUILayout.BeginVertical("box");
 
-                        using (new EditorGUI.DisabledGroupScope(!EnableBlink.boolValue))
+                        _eyeBlinkSettingsFoldout = EditorGUILayout.Foldout(_eyeBlinkSettingsFoldout, "Blink", true);
+
+                        if (_eyeBlinkSettingsFoldout)
                         {
-                            EditorGUILayout.PropertyField(AutoBlink);
+                            EditorGUILayout.PropertyField(EnableBlink);
 
-                            using (new EditorGUI.DisabledGroupScope(AutoBlink.boolValue))
+                            using (new EditorGUI.DisabledGroupScope(!EnableBlink.boolValue))
                             {
-                                EditorGUILayout.PropertyField(LinkBlinks);
-                                EditorGUILayout.PropertyField(AllowWinking);
-                                EditorGUILayout.PropertyField(EyeClosedThreshold);
-                                EditorGUILayout.PropertyField(EyeOpenedThreshold);
-                                EditorGUILayout.PropertyField(SmartWinkThreshold);
-                                EditorGUILayout.PropertyField(BlinkSmoothing);
+                                EditorGUILayout.PropertyField(AutoBlink);
+
+                                using (new EditorGUI.DisabledGroupScope(AutoBlink.boolValue))
+                                {
+                                    EditorGUILayout.PropertyField(LinkBlinks);
+                                    EditorGUILayout.PropertyField(AllowWinking);
+                                    EditorGUILayout.PropertyField(EyeClosedThreshold);
+                                    EditorGUILayout.PropertyField(EyeOpenedThreshold);
+                                    EditorGUILayout.PropertyField(SmartWinkThreshold);
+                                    EditorGUILayout.PropertyField(BlinkSmoothing);
+                                }
                             }
                         }
-                    }
 
-                    EditorGUILayout.Space();
+                        EditorGUILayout.Space();
 
-                    _gazeSettingsFoldout = EditorGUILayout.Foldout(_gazeSettingsFoldout, "Gaze", true);
+                        _gazeSettingsFoldout = EditorGUILayout.Foldout(_gazeSettingsFoldout, "Gaze", true);
 
-                    if (_gazeSettingsFoldout)
-                    {
-                        EditorGUILayout.PropertyField(EnableGaze);
-
-                        using (new EditorGUI.DisabledGroupScope(!EnableGaze.boolValue))
+                        if (_gazeSettingsFoldout)
                         {
-                            EditorGUILayout.PropertyField(GazeSmoothing);
-                            EditorGUILayout.PropertyField(GazeStrength);
+                            EditorGUILayout.PropertyField(EnableGaze);
+
+                            using (new EditorGUI.DisabledGroupScope(!EnableGaze.boolValue))
+                            {
+                                EditorGUILayout.PropertyField(GazeSmoothing);
+                                EditorGUILayout.PropertyField(GazeStrength);
+                            }
                         }
-                    }
 
-                    EditorGUILayout.Space();
+                        EditorGUILayout.Space();
 
-                    _mouthSettingsFoldout = EditorGUILayout.Foldout(_mouthSettingsFoldout, "Mouth", true);
+                        _mouthSettingsFoldout = EditorGUILayout.Foldout(_mouthSettingsFoldout, "Mouth", true);
 
-                    if (_mouthSettingsFoldout)
-                    {
-                        EditorGUILayout.PropertyField(EnableMouth);
-
-                        using (new EditorGUI.DisabledGroupScope(!EnableMouth.boolValue))
+                        if (_mouthSettingsFoldout)
                         {
-                            EditorGUILayout.PropertyField(MouthOpenSensitivity);
-                            EditorGUILayout.PropertyField(MouthShapeSensitivity);
-                            EditorGUILayout.PropertyField(MouthSmoothing);
-                        }
-                    }
+                            EditorGUILayout.PropertyField(EnableMouth);
 
-                    EditorGUILayout.EndVertical();
+                            using (new EditorGUI.DisabledGroupScope(!EnableMouth.boolValue))
+                            {
+                                EditorGUILayout.PropertyField(MouthOpenSensitivity);
+                                EditorGUILayout.PropertyField(MouthShapeSensitivity);
+                                EditorGUILayout.PropertyField(MouthSmoothing);
+                            }
+                        }
+
+                        EditorGUILayout.EndVertical();
+                    }
                 }
+            }
+            else
+            {
+                EditorGUILayout.HelpBox("Face tracking is not available because VRM is not installed.", MessageType.Warning);
             }
 
             EditorGUILayout.Space();
-
             EditorGUILayout.LabelField($"{AssetInfo.AssetName} (v{AssetInfo.AssetVersion})", EditorStyles.centeredGreyMiniLabel);
 
             serializedObject.ApplyModifiedProperties();

@@ -3,7 +3,10 @@ using RootMotion;
 using RootMotion.FinalIK;
 using System.Collections.Generic;
 using UnityEngine;
+
+#if ENABLE_VRM
 using UniVRM10;
+#endif
 
 namespace PMC
 {
@@ -14,13 +17,16 @@ namespace PMC
         // Fields
 
         public PrismTracker Tracker;
-        private Vrm10Instance _vrm;
         private Animator _animator;
         private VRIK _VRIK;
         private FullBodyBipedIK _FBBIK;
         private TwistRelaxer _twistRelaxer;
         private FBBIKHeadEffector _headEffector;
         public IKType IKType = IKType.VRIK;
+
+#if ENABLE_VRM
+        private Vrm10Instance _vrm;
+#endif
 
         public bool EnableTwistRelaxer = true;
         public bool EnableMovement = true;
@@ -111,15 +117,26 @@ namespace PMC
         private readonly Dictionary<HumanBodyBones, Vector3> _initialBoneDirections = new();
 
 
+        // Properties
+
+        public bool EnableVRM { get; }
+#if ENABLE_VRM
+            = true;
+#else
+            = false;
+#endif
+
         // Methods
 
         private void Awake()
         {
             if (!enabled || Tracker == null) return;
 
+#if ENABLE_VRM
             _vrm = gameObject.GetComponent<Vrm10Instance>();
 
             if (_vrm == null) return;
+#endif
 
             _animator = gameObject.GetComponent<Animator>();
 
@@ -952,6 +969,7 @@ namespace PMC
 
         private void UpdateBlink()
         {
+#if ENABLE_VRM
             if (!EnableBlink || !Tracker.ActiveFaceBlendShapes) return;
 
             if (AutoBlink)
@@ -1014,10 +1032,12 @@ namespace PMC
                 _currentBlinkLeft = Mathf.Lerp(_currentBlinkLeft, targetLeft, 1f - BlinkSmoothing);
                 _currentBlinkRight = Mathf.Lerp(_currentBlinkRight, targetRight, 1f - BlinkSmoothing);
             }
+#endif
         }
 
         private void UpdateGaze()
         {
+#if ENABLE_VRM
             if (!EnableGaze || !Tracker.ActiveFaceBlendShapes) return;
 
             var targetLookUp = (Tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookUpLeft] + Tracker.FaceBlendShapes[(int)FaceBlendShapes.EyeLookUpRight]) / 2f;
@@ -1046,10 +1066,12 @@ namespace PMC
             var lookLeftRight = _currentLookLeft - _currentLookRight;
 
             _vrm.Runtime.LookAt.SetYawPitchManually(GazeStrength * lookLeftRight, GazeStrength * lookUpDown);
+#endif
         }
 
         private void UpdateMouth()
         {
+#if ENABLE_VRM
             if (!EnableMouth || !Tracker.ActiveFaceBlendShapes) return;
 
             var mouthOpen = Tracker.FaceBlendShapes[(int)FaceBlendShapes.JawOpen] * MouthOpenSensitivity;
@@ -1085,6 +1107,7 @@ namespace PMC
             _vrm.Runtime.Expression.SetWeight(ExpressionKey.Ou, Mathf.Max(_vrm.Runtime.Expression.GetWeight(ExpressionKey.Ou), funnel));
 
             _mouthInterpolate.UpdateTime(Time.timeAsDouble);
+#endif
         }
 
         private void ResetHandBones(bool isRightHand = false)
