@@ -8,11 +8,10 @@ namespace PMC.Editor
     {
         private SerializedProperty Tracker;
         private SerializedProperty IKType;
-        private SerializedProperty EnableTwistRelaxer;
         private SerializedProperty EnableMovement;
-        private SerializedProperty AutoWeight;
-        private SerializedProperty RotationSmoothSpeed;
-        private SerializedProperty PositionSmoothSpeed;
+        private SerializedProperty EnableAutoWeight;
+        private SerializedProperty EnableBoneConstraint;
+        private SerializedProperty EnableTwistRelaxer;
         private SerializedProperty WeightSmoothingSpeed;
         private SerializedProperty EnableHandTracking;
         private SerializedProperty FingerResetSpeed;
@@ -43,12 +42,10 @@ namespace PMC.Editor
         {
             Tracker = serializedObject.FindProperty(nameof(Tracker));
             IKType = serializedObject.FindProperty(nameof(IKType));
-            EnableTwistRelaxer = serializedObject.FindProperty(nameof(EnableTwistRelaxer));
             EnableMovement = serializedObject.FindProperty(nameof(EnableMovement));
-            AutoWeight = serializedObject.FindProperty(nameof(AutoWeight));
-            WeightSmoothingSpeed = serializedObject.FindProperty(nameof(WeightSmoothingSpeed));
-            RotationSmoothSpeed = serializedObject.FindProperty(nameof(RotationSmoothSpeed));
-            PositionSmoothSpeed = serializedObject.FindProperty(nameof(PositionSmoothSpeed));
+            EnableAutoWeight = serializedObject.FindProperty(nameof(EnableAutoWeight));
+            EnableBoneConstraint = serializedObject.FindProperty(nameof(EnableBoneConstraint));
+            EnableTwistRelaxer = serializedObject.FindProperty(nameof(EnableTwistRelaxer));
             WeightSmoothingSpeed = serializedObject.FindProperty(nameof(WeightSmoothingSpeed));
             EnableHandTracking = serializedObject.FindProperty(nameof(EnableHandTracking));
             FingerResetSpeed = serializedObject.FindProperty(nameof(FingerResetSpeed));
@@ -79,11 +76,10 @@ namespace PMC.Editor
             EditorGUILayout.BeginVertical("box");
             EditorGUILayout.PropertyField(Tracker);
             EditorGUILayout.PropertyField(IKType);
-            EditorGUILayout.PropertyField(EnableTwistRelaxer);
             EditorGUILayout.PropertyField(EnableMovement);
-            EditorGUILayout.PropertyField(AutoWeight);
-            EditorGUILayout.PropertyField(RotationSmoothSpeed);
-            EditorGUILayout.PropertyField(PositionSmoothSpeed);
+            EditorGUILayout.PropertyField(EnableAutoWeight);
+            EditorGUILayout.PropertyField(EnableBoneConstraint);
+            EditorGUILayout.PropertyField(EnableTwistRelaxer);
             EditorGUILayout.PropertyField(WeightSmoothingSpeed);
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space();
